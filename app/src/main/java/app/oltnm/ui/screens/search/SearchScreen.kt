@@ -52,6 +52,7 @@ import app.oltnm.ui.components.OltnFilterChip
 import app.oltnm.ui.components.OltnTextField
 import app.oltnm.ui.components.OltnTopBar
 import app.oltnm.ui.components.StatusCard
+import app.oltnm.ui.components.rememberEmojiText
 import app.oltnm.ui.components.rememberOpenUrl
 import app.oltnm.ui.factoryOf
 import app.oltnm.ui.theme.LocalOltnSemantics
@@ -66,7 +67,8 @@ private enum class SearchTab(@StringRes val labelRes: Int) {
 @Composable
 fun SearchScreen(
     api: MastodonApi,
-    onOpenAccount: (String) -> Unit
+    onOpenAccount: (String) -> Unit,
+    onOpenStatus: (String) -> Unit
 ) {
     val viewModel: SearchViewModel = viewModel(
         key = "search-${api.hashCode()}",
@@ -151,6 +153,7 @@ fun SearchScreen(
                                 StatusCard(
                                     status = status,
                                     onOpenAccount = onOpenAccount,
+                                    onOpenStatus = { onOpenStatus(it.original.id) },
                                     onOpenUrl = openUrl,
                                     onFavourite = viewModel::toggleFavourite,
                                     onReblog = viewModel::toggleReblog
@@ -176,8 +179,10 @@ private fun AccountRow(account: Account, onOpenAccount: (String) -> Unit) {
         Avatar(url = account.avatar, size = 48.dp)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
+            val accountName = rememberEmojiText(account.nameOrHandle, account.emojis)
             Text(
-                text = account.nameOrHandle,
+                text = accountName.text,
+                inlineContent = accountName.inlineContent,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -188,10 +193,15 @@ private fun AccountRow(account: Account, onOpenAccount: (String) -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            val note = HtmlText.plain(account.note)
+            val note = HtmlText.plain(
+                account.note,
+                account.emojis.filter { it.url.isNotBlank() }.map { it.shortcode }.toSet()
+            )
+            val noteText = rememberEmojiText(note, account.emojis)
             if (note.isNotBlank()) {
                 Text(
-                    text = note,
+                    text = noteText.text,
+                    inlineContent = noteText.inlineContent,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,

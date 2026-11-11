@@ -58,7 +58,8 @@ private enum class TrendingTab {
 fun TrendingScreen(
     api: MastodonApi,
     onBack: () -> Unit,
-    onOpenHashtag: (String) -> Unit
+    onOpenHashtag: (String) -> Unit,
+    onOpenStatus: (String) -> Unit
 ) {
     val viewModel: TrendingViewModel = viewModel(
         key = "trending-${api.hashCode()}",
@@ -124,6 +125,7 @@ fun TrendingScreen(
                             StatusCard(
                                 status = status,
                                 onOpenAccount = {},
+                                onOpenStatus = { onOpenStatus(it.original.id) },
                                 onOpenUrl = openUrl,
                                 onFavourite = {},
                                 onReblog = {},

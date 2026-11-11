@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTextApi::class)
+
 package app.oltnm.ui.components
 
 import androidx.compose.foundation.background
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Favorite
@@ -35,7 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -44,6 +47,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.oltnm.R
+import app.oltnm.data.model.Emoji
 import app.oltnm.data.model.Status
 import app.oltnm.ui.theme.LocalOltnSemantics
 import app.oltnm.util.HtmlText
@@ -53,6 +57,7 @@ import app.oltnm.util.RelativeTime
 fun StatusCard(
     status: Status,
     onOpenAccount: (String) -> Unit,
+    onOpenStatus: (Status) -> Unit,
     onOpenUrl: (String) -> Unit,
     onFavourite: (Status) -> Unit,
     onReblog: (Status) -> Unit,
@@ -65,7 +70,11 @@ fun StatusCard(
         mutableStateOf(displayed.spoilerText.isBlank())
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onOpenStatus(displayed) }
+    ) {
         if (status.reblog != null) {
             Row(
                 modifier = Modifier.padding(start = 16.dp, top = 10.dp, end = 16.dp),
@@ -104,8 +113,13 @@ fun StatusCard(
                             .weight(1f)
                             .clickable { onOpenAccount(displayed.account.id) }
                     ) {
+                        val accountName = rememberEmojiText(
+                            displayed.account.nameOrHandle,
+                            displayed.account.emojis
+                        )
                         Text(
-                            text = displayed.account.nameOrHandle,
+                            text = accountName.text,
+                            inlineContent = accountName.inlineContent,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -191,6 +205,7 @@ fun StatusCard(
                 StatusActions(
                     status = displayed,
                     onOpenUrl = onOpenUrl,
+                    onOpenStatus = { onOpenStatus(displayed) },
                     onFavourite = { onFavourite(status) },
                     onReblog = { onReblog(status) },
                     interactive = interactive
@@ -207,15 +222,17 @@ fun StatusCard(
 
 @Composable
 private fun StatusBody(status: Status, onOpenUrl: (String) -> Unit) {
-    val body = HtmlText.plain(status.content)
+    val body = HtmlText.plain(
+        status.content,
+        status.emojis.filter { it.url.isNotBlank() }.map { it.shortcode }.toSet()
+    )
     if (body.isNotBlank()) {
-        val annotated = rememberStatusText(body)
+        val emojiText = rememberStatusText(body, status.emojis)
         Text(
-            text = annotated,
+            text = emojiText.text,
+            inlineContent = emojiText.inlineContent,
             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 23.sp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { status.displayUrl?.let(onOpenUrl) }
+            modifier = Modifier.fillMaxWidth()
         )
     }
     MediaGrid(media = status.mediaAttachments, onOpenUrl = onOpenUrl)
@@ -223,33 +240,54 @@ private fun StatusBody(status: Status, onOpenUrl: (String) -> Unit) {
 }
 
 @Composable
-private fun rememberStatusText(body: String): AnnotatedString {
+private fun rememberStatusText(body: String, emojis: List<Emoji>): EmojiTextData {
     val semantics = LocalOltnSemantics.current
     val mentionColor = MaterialTheme.colorScheme.onSurfaceVariant
-    return remember(body, semantics.link, semantics.tag, mentionColor) {
+    val available = remember(emojis) { emojis.filter { it.url.isNotBlank() } }
+    val inlineContent = remember(available) { available.toInlineContent() }
+    val emojiByShortcode = remember(available) { available.associateBy { it.shortcode } }
+    val annotated = remember(body, semantics.link, semantics.tag, mentionColor, emojiByShortcode) {
         buildAnnotatedString {
-            val pattern = Regex("""(https?://\S+|#[\p{L}\p{N}_]+|@[\p{L}\p{N}_@.]+)""")
+            val pattern = Regex(
+                """(https?://\S+|#[\p{L}\p{N}_]+|@[\p{L}\p{N}_@.]+|:[A-Za-z0-9_-]+:)"""
+            )
             var cursor = 0
             pattern.findAll(body).forEach { match ->
                 append(body.substring(cursor, match.range.first))
                 val token = match.value
-                val color = when {
-                    token.startsWith("#") -> semantics.tag
-                    token.startsWith("@") -> mentionColor
-                    else -> semantics.link
+                val emoji = if (token.startsWith(":")) {
+                    emojiByShortcode[token.removeSurrounding(":")]
+                } else {
+                    null
                 }
-                withStyle(SpanStyle(color = color)) { append(token) }
+                if (emoji != null) {
+                    appendInlineContent("emoji:${emoji.shortcode}", token)
+                } else {
+                    val color = when {
+                        token.startsWith("#") -> semantics.tag
+                        token.startsWith("@") -> mentionColor
+                        token.startsWith(":") -> null
+                        else -> semantics.link
+                    }
+                    if (color != null) {
+                        withStyle(SpanStyle(color = color)) { append(token) }
+                    } else {
+                        append(token)
+                    }
+                }
                 cursor = match.range.last + 1
             }
             append(body.substring(cursor))
         }
     }
+    return EmojiTextData(annotated, inlineContent)
 }
 
 @Composable
 private fun StatusActions(
     status: Status,
     onOpenUrl: (String) -> Unit,
+    onOpenStatus: () -> Unit,
     onFavourite: () -> Unit,
     onReblog: () -> Unit,
     interactive: Boolean
@@ -267,7 +305,7 @@ private fun StatusActions(
                 tint = semantics.reply,
                 active = false,
                 contentDescription = stringResource(R.string.action_reply),
-                onClick = { status.displayUrl?.let(onOpenUrl) }
+                onClick = onOpenStatus
             )
             StatusAction(
                 icon = Icons.Rounded.Repeat,

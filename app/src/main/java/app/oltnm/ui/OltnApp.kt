@@ -53,6 +53,7 @@ import app.oltnm.ui.screens.profile.ProfileScreen
 import app.oltnm.ui.screens.scheduled.ScheduledScreen
 import app.oltnm.ui.screens.search.SearchScreen
 import app.oltnm.ui.screens.settings.SettingsScreen
+import app.oltnm.ui.screens.status.StatusDetailScreen
 import app.oltnm.ui.screens.timelines.ManageTimelinesScreen
 import app.oltnm.ui.screens.trending.TrendingScreen
 import app.oltnm.ui.theme.OltnTheme
@@ -70,6 +71,7 @@ sealed interface Route {
     data object Scheduled : Route
     data class Profile(val accountId: String) : Route
     data class StatusTimeline(val spec: TimelineSpec, val title: String) : Route
+    data class StatusDetail(val statusId: String, val host: String? = null) : Route
 }
 
 private data class Tab(
@@ -135,12 +137,20 @@ private fun MainScaffold(
     val openAccount: (String) -> Unit = { accountId ->
         stack.add(Route.Profile(accountId))
     }
+    val openStatus: (String, String?) -> Unit = { statusId, host ->
+        stack.add(Route.StatusDetail(statusId, host))
+    }
     val back: () -> Unit = {
         if (stack.size > 1) stack.removeAt(stack.lastIndex)
     }
 
     BackHandler(enabled = stack.size > 1, onBack = back)
     val navDividerColor = MaterialTheme.colorScheme.outlineVariant
+    val detailRoute = route as? Route.StatusDetail
+    val detailApi = remember(detailRoute?.statusId, detailRoute?.host) {
+        val host = detailRoute?.host
+        if (host.isNullOrBlank()) api else container.publicApiForHost(host)
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -242,11 +252,13 @@ private fun MainScaffold(
                     api = api,
                     session = session,
                     onOpenAccount = openAccount,
+                    onOpenStatus = openStatus,
                     onManageTimelines = { navigate(Route.ManageTimelines) }
                 )
                 Route.Search -> SearchScreen(
                     api = api,
-                    onOpenAccount = openAccount
+                    onOpenAccount = openAccount,
+                    onOpenStatus = { id -> openStatus(id, null) }
                 )
                 Route.Compose -> ComposeScreen(
                     api = api,
@@ -258,7 +270,8 @@ private fun MainScaffold(
                 )
                 Route.Notifications -> NotificationsScreen(
                     api = api,
-                    onOpenAccount = openAccount
+                    onOpenAccount = openAccount,
+                    onOpenStatus = { id -> openStatus(id, null) }
                 )
                 Route.Settings -> SettingsScreen(
                     container = container,
@@ -274,7 +287,8 @@ private fun MainScaffold(
                 Route.Newsletter -> NewsletterScreen(
                     container = container,
                     api = api,
-                    onBack = back
+                    onBack = back,
+                    onOpenStatus = { id -> openStatus(id, null) }
                 )
                 Route.Lists -> ListsScreen(
                     container = container,
@@ -297,6 +311,7 @@ private fun MainScaffold(
                 Route.Trending -> TrendingScreen(
                     api = api,
                     onBack = back,
+                    onOpenStatus = { id -> openStatus(id, null) },
                     onOpenHashtag = { name ->
                         navigate(
                             Route.StatusTimeline(
@@ -319,14 +334,24 @@ private fun MainScaffold(
                     api = api,
                     accountId = current.accountId,
                     onBack = back,
-                    onOpenAccount = openAccount
+                    onOpenAccount = openAccount,
+                    onOpenStatus = { id -> openStatus(id, null) }
                 )
                 is Route.StatusTimeline -> StatusTimelineScreen(
                     api = api,
                     spec = current.spec,
                     title = current.title,
                     onBack = back,
-                    onOpenAccount = openAccount
+                    onOpenAccount = openAccount,
+                    onOpenStatus = { id -> openStatus(id, null) }
+                )
+                is Route.StatusDetail -> StatusDetailScreen(
+                    api = detailApi,
+                    statusId = current.statusId,
+                    interactive = current.host.isNullOrBlank(),
+                    onBack = back,
+                    onOpenAccount = openAccount,
+                    onOpenStatus = { id -> openStatus(id, current.host) }
                 )
             }
         }

@@ -22,4 +22,16 @@ class HtmlTextTest {
         assertEquals("", HtmlText.plain(""))
         assertEquals("", HtmlText.plain("   "))
     }
+
+    @Test
+    fun keepsCustomEmojiShortcodes() {
+        val html = "<p>hi <img class=\"custom-emoji\" alt=\":blob:\" src=\"https://x\"> there</p>"
+        assertEquals("hi :blob: there", HtmlText.plain(html, setOf("blob")))
+    }
+
+    @Test
+    fun dropsUnknownEmojiImages() {
+        val html = "<p>hi <img alt=\":smile:\" src=\"https://x\">there</p>"
+        assertEquals("hi there", HtmlText.plain(html, setOf("blob")))
+    }
 }

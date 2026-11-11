@@ -11,6 +11,7 @@ import app.oltnm.data.model.Notification
 import app.oltnm.data.model.ScheduledStatus
 import app.oltnm.data.model.SearchResults
 import app.oltnm.data.model.Status
+import app.oltnm.data.model.StatusContext
 import app.oltnm.data.model.StatusRequest
 import app.oltnm.data.model.Tag
 import app.oltnm.data.model.TokenResponse
@@ -195,6 +196,10 @@ class MastodonApi(
         "/api/v2/search",
         mapOf("q" to query, "resolve" to "true", "limit" to limit.toString())
     )
+
+    suspend fun status(statusId: String): Status = getJson<Status>("/api/v1/statuses/$statusId")
+
+    suspend fun statusContext(statusId: String): StatusContext = getJson<StatusContext>("/api/v1/statuses/$statusId/context")
 
     suspend fun favourite(statusId: String): Status = postJson<Status>("/api/v1/statuses/$statusId/favourite")
 

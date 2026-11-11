@@ -18,6 +18,9 @@
     <string name="boosted_by">%1$s republicou</string>
     <string name="content_warning">Aviso de conteúdo</string>
     <string name="tap_to_show">Toque para mostrar</string>
+    <string name="status_title">Publicação</string>
+    <string name="ancestors_title">Em resposta a</string>
+    <string name="descendants_title">Respostas</string>
     <string name="action_reply">Responder</string>
     <string name="action_boost">Republicar</string>
     <string name="action_favourite">Favoritar</string>

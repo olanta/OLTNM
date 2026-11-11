@@ -101,6 +101,12 @@ data class Status(
 }
 
 @Serializable
+data class StatusContext(
+    val ancestors: List<Status> = emptyList(),
+    val descendants: List<Status> = emptyList()
+)
+
+@Serializable
 data class Mention(
     val id: String = "",
     val username: String = "",

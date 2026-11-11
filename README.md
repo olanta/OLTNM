@@ -64,11 +64,11 @@ make run-emu     # start emulator, wait, install and launch
 ktlint and Android lint without a device.
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
-The first signed release is `dist/OLTNM-1.0.0.apk` (SHA-256 alongside). Sideload
-it, or run:
+The latest signed release is `dist/OLTNM-1.1.0.apk` (SHA-256 alongside).
+Sideload it, or run:
 
 ```bash
-adb install -r dist/OLTNM-1.0.0.apk
+adb install -r dist/OLTNM-1.1.0.apk
 ```
 
 The release package is `app.oltnm`, so it can be installed alongside the debug
@@ -78,8 +78,8 @@ build (`app.oltnm.debug`).
 
 OLTNM follows [Semantic Versioning 2.0.0](https://semver.org/). `versionName`
 is the SemVer source of truth; `versionCode` is a separate monotonically
-increasing Android update counter. The current release is **1.0.0**
-(`versionCode = 1`).
+increasing Android update counter. The current release is **1.1.0**
+(`versionCode = 2`).
 
 ## Contributing
 

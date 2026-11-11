@@ -72,6 +72,7 @@ fun TimelineScreen(
     api: MastodonApi,
     session: Session,
     onOpenAccount: (String) -> Unit,
+    onOpenStatus: (String, String?) -> Unit,
     onManageTimelines: () -> Unit
 ) {
     val timelines by container.timelineStore.timelines.collectAsStateWithLifecycle()
@@ -144,6 +145,7 @@ fun TimelineScreen(
         } else {
             val remote = selected.type == TimelineTypes.REMOTE_LOCAL ||
                 selected.type == TimelineTypes.REMOTE_FEDERATED
+            val remoteHost = if (remote) selected.host else null
             val remoteApi = if (remote) {
                 val host = selected.host.orEmpty()
                 remember(selected.id, host) { container.publicApiForHost(host) }
@@ -157,7 +159,8 @@ fun TimelineScreen(
                     remoteApi = remoteApi,
                     interactive = !remote,
                     refreshSignal = refreshSignal,
-                    onOpenAccount = onOpenAccount
+                    onOpenAccount = onOpenAccount,
+                    onOpenStatus = { id -> onOpenStatus(id, remoteHost) }
                 )
             }
         }
@@ -226,7 +229,8 @@ private fun TimelineView(
     remoteApi: MastodonApi?,
     interactive: Boolean,
     refreshSignal: Int,
-    onOpenAccount: (String) -> Unit
+    onOpenAccount: (String) -> Unit,
+    onOpenStatus: (String) -> Unit
 ) {
     val viewModel: TimelineViewModel = viewModel(
         key = "timeline-${spec.id}-${spec.host}-${ownApi.hashCode()}",
@@ -290,6 +294,7 @@ private fun TimelineView(
                     StatusCard(
                         status = status,
                         onOpenAccount = accountCallback,
+                        onOpenStatus = { onOpenStatus(it.original.id) },
                         onOpenUrl = openUrl,
                         onFavourite = viewModel::toggleFavourite,
                         onReblog = viewModel::toggleReblog,
@@ -314,7 +319,8 @@ fun StatusTimelineScreen(
     spec: TimelineSpec,
     title: String,
     onBack: () -> Unit,
-    onOpenAccount: (String) -> Unit
+    onOpenAccount: (String) -> Unit,
+    onOpenStatus: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         OltnTopBar(
@@ -335,7 +341,8 @@ fun StatusTimelineScreen(
                 remoteApi = null,
                 interactive = true,
                 refreshSignal = 0,
-                onOpenAccount = onOpenAccount
+                onOpenAccount = onOpenAccount,
+                onOpenStatus = onOpenStatus
             )
         }
     }

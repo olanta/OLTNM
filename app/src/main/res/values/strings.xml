@@ -18,6 +18,9 @@
     <string name="boosted_by">%1$s boosted</string>
     <string name="content_warning">Content warning</string>
     <string name="tap_to_show">Tap to show</string>
+    <string name="status_title">Post</string>
+    <string name="ancestors_title">In reply to</string>
+    <string name="descendants_title">Replies</string>
     <string name="action_reply">Reply</string>
     <string name="action_boost">Boost</string>
     <string name="action_favourite">Favourite</string>

@@ -58,7 +58,8 @@ import app.oltnm.ui.factoryOf
 fun NewsletterScreen(
     container: AppContainer,
     api: MastodonApi,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenStatus: (String) -> Unit
 ) {
     val viewModel: NewsletterViewModel = viewModel(
         key = "newsletter-${api.hashCode()}",
@@ -137,6 +138,7 @@ fun NewsletterScreen(
                         StatusCard(
                             status = status,
                             onOpenAccount = {},
+                            onOpenStatus = { onOpenStatus(it.original.id) },
                             onOpenUrl = openUrl,
                             onFavourite = {},
                             onReblog = {},

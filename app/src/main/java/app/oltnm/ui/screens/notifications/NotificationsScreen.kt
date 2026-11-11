@@ -48,7 +48,7 @@ import app.oltnm.ui.components.LoadMoreButton
 import app.oltnm.ui.components.LoadingRow
 import app.oltnm.ui.components.LoadingView
 import app.oltnm.ui.components.OltnTopBar
-import app.oltnm.ui.components.rememberOpenUrl
+import app.oltnm.ui.components.rememberEmojiText
 import app.oltnm.ui.factoryOf
 import app.oltnm.ui.theme.LocalOltnSemantics
 import app.oltnm.util.HtmlText
@@ -58,11 +58,11 @@ import app.oltnm.util.RelativeTime
 @Composable
 fun NotificationsScreen(
     api: MastodonApi,
-    onOpenAccount: (String) -> Unit
+    onOpenAccount: (String) -> Unit,
+    onOpenStatus: (String) -> Unit
 ) {
     val viewModel: NotificationsViewModel = viewModel(key = "notifications-${api.hashCode()}", factory = factoryOf { NotificationsViewModel(api) })
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val openUrl = rememberOpenUrl()
     val listState = rememberLazyListState()
 
     val shouldLoadMore by remember {
@@ -103,7 +103,7 @@ fun NotificationsScreen(
                         NotificationRow(
                             notification = notification,
                             onOpenAccount = onOpenAccount,
-                            onOpenStatus = { url -> openUrl(url) }
+                            onOpenStatus = onOpenStatus
                         )
                     }
                     item {
@@ -153,7 +153,7 @@ private fun NotificationRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { notification.status?.displayUrl?.let(onOpenStatus) }
+            .clickable { notification.status?.let { onOpenStatus(it.original.id) } }
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.Top
     ) {
@@ -188,8 +188,17 @@ private fun NotificationRow(
                 )
             }
             notification.status?.let { status ->
+                val content = HtmlText.plain(
+                    status.original.content,
+                    status.original.emojis
+                        .filter { it.url.isNotBlank() }
+                        .map { it.shortcode }
+                        .toSet()
+                )
+                val preview = rememberEmojiText(content, status.original.emojis)
                 Text(
-                    text = HtmlText.plain(status.original.content),
+                    text = preview.text,
+                    inlineContent = preview.inlineContent,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 3,

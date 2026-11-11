@@ -48,6 +48,7 @@ import app.oltnm.ui.components.LoadingView
 import app.oltnm.ui.components.OltnTopBar
 import app.oltnm.ui.components.StatusCard
 import app.oltnm.ui.components.formatCount
+import app.oltnm.ui.components.rememberEmojiText
 import app.oltnm.ui.components.rememberOpenUrl
 import app.oltnm.ui.factoryOf
 import app.oltnm.util.HtmlText
@@ -59,7 +60,8 @@ fun ProfileScreen(
     api: MastodonApi,
     accountId: String,
     onBack: () -> Unit,
-    onOpenAccount: (String) -> Unit
+    onOpenAccount: (String) -> Unit,
+    onOpenStatus: (String) -> Unit
 ) {
     val viewModel: ProfileViewModel = viewModel(key = "profile-${api.hashCode()}-$accountId", factory = factoryOf { ProfileViewModel(api, accountId) })
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -130,6 +132,7 @@ fun ProfileScreen(
                             StatusCard(
                                 status = status,
                                 onOpenAccount = onOpenAccount,
+                                onOpenStatus = { onOpenStatus(it.original.id) },
                                 onOpenUrl = openUrl,
                                 onFavourite = viewModel::toggleFavourite,
                                 onReblog = viewModel::toggleReblog
@@ -175,8 +178,10 @@ private fun ProfileHeader(account: Account) {
             Avatar(url = account.avatar, size = 68.dp)
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
+                val accountName = rememberEmojiText(account.nameOrHandle, account.emojis)
                 Text(
-                    text = account.nameOrHandle,
+                    text = accountName.text,
+                    inlineContent = accountName.inlineContent,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -197,10 +202,15 @@ private fun ProfileHeader(account: Account) {
             }
         }
 
-        val note = HtmlText.plain(account.note)
+        val note = HtmlText.plain(
+            account.note,
+            account.emojis.filter { it.url.isNotBlank() }.map { it.shortcode }.toSet()
+        )
+        val noteText = rememberEmojiText(note, account.emojis)
         if (note.isNotBlank()) {
             Text(
-                text = note,
+                text = noteText.text,
+                inlineContent = noteText.inlineContent,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
