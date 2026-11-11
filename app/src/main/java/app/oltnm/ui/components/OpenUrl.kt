@@ -1,0 +1,18 @@
+package app.oltnm.ui.components
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+
+@Composable
+fun rememberOpenUrl(): (String) -> Unit {
+    val context = LocalContext.current
+    return remember(context) {
+        val handler: (String) -> Unit = { url ->
+            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+        }
+        handler
+    }
+}
