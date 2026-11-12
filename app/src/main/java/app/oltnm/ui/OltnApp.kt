@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,10 +40,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.oltnm.R
 import app.oltnm.data.model.Session
+import app.oltnm.data.model.Status
 import app.oltnm.data.model.TimelineSpec
 import app.oltnm.data.model.TimelineTypes
 import app.oltnm.di.AppContainer
 import app.oltnm.ui.screens.compose.ComposeScreen
+import app.oltnm.ui.screens.compose.ReplyTarget
 import app.oltnm.ui.screens.home.StatusTimelineScreen
 import app.oltnm.ui.screens.home.TimelineScreen
 import app.oltnm.ui.screens.lists.ListsScreen
@@ -57,6 +60,7 @@ import app.oltnm.ui.screens.status.StatusDetailScreen
 import app.oltnm.ui.screens.timelines.ManageTimelinesScreen
 import app.oltnm.ui.screens.trending.TrendingScreen
 import app.oltnm.ui.theme.OltnTheme
+import app.oltnm.util.OAuthBus
 
 sealed interface Route {
     data object Home : Route
@@ -72,6 +76,7 @@ sealed interface Route {
     data class Profile(val accountId: String) : Route
     data class StatusTimeline(val spec: TimelineSpec, val title: String) : Route
     data class StatusDetail(val statusId: String, val host: String? = null) : Route
+    data class ComposeReply(val target: ReplyTarget) : Route
 }
 
 private data class Tab(
@@ -104,13 +109,34 @@ fun OltnApp(container: AppContainer) {
     ) {
         val session by container.sessionStore.session.collectAsStateWithLifecycle()
         val current = session
+        var addingAccount by rememberSaveable { mutableStateOf(false) }
+        var addAccountNonce by rememberSaveable { mutableStateOf(0) }
         if (current == null) {
             LoginScreen(container = container)
+        } else if (addingAccount) {
+            LoginScreen(
+                container = container,
+                viewModelKey = "add-account-$addAccountNonce",
+                onCancel = {
+                    container.sessionStore.clearPending()
+                    OAuthBus.consumeCode()
+                    OAuthBus.consumeError()
+                    addingAccount = false
+                },
+                onSignedIn = { addingAccount = false }
+            )
         } else {
             MainScaffold(
                 container = container,
                 session = current,
-                onLogout = { container.sessionStore.clear() }
+                onLogout = { container.sessionStore.removeCurrent() },
+                onAddAccount = {
+                    container.sessionStore.clearPending()
+                    OAuthBus.consumeCode()
+                    OAuthBus.consumeError()
+                    addAccountNonce += 1
+                    addingAccount = true
+                }
             )
         }
     }
@@ -120,7 +146,8 @@ fun OltnApp(container: AppContainer) {
 private fun MainScaffold(
     container: AppContainer,
     session: Session,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onAddAccount: () -> Unit
 ) {
     val api = remember(session.accessToken, session.host) { container.apiFor(session) }
     val stack = remember { mutableStateListOf<Route>(Route.Home) }
@@ -139,6 +166,9 @@ private fun MainScaffold(
     }
     val openStatus: (String, String?) -> Unit = { statusId, host ->
         stack.add(Route.StatusDetail(statusId, host))
+    }
+    val openReply: (Status) -> Unit = { status ->
+        stack.add(Route.ComposeReply(ReplyTarget.from(status)))
     }
     val back: () -> Unit = {
         if (stack.size > 1) stack.removeAt(stack.lastIndex)
@@ -253,12 +283,14 @@ private fun MainScaffold(
                     session = session,
                     onOpenAccount = openAccount,
                     onOpenStatus = openStatus,
+                    onReply = openReply,
                     onManageTimelines = { navigate(Route.ManageTimelines) }
                 )
                 Route.Search -> SearchScreen(
                     api = api,
                     onOpenAccount = openAccount,
-                    onOpenStatus = { id -> openStatus(id, null) }
+                    onOpenStatus = { id -> openStatus(id, null) },
+                    onReply = openReply
                 )
                 Route.Compose -> ComposeScreen(
                     api = api,
@@ -277,6 +309,7 @@ private fun MainScaffold(
                     container = container,
                     session = session,
                     onLogout = onLogout,
+                    onAddAccount = onAddAccount,
                     onBack = back
                 )
                 Route.ManageTimelines -> ManageTimelinesScreen(
@@ -288,7 +321,8 @@ private fun MainScaffold(
                     container = container,
                     api = api,
                     onBack = back,
-                    onOpenStatus = { id -> openStatus(id, null) }
+                    onOpenStatus = { id -> openStatus(id, null) },
+                    onReply = openReply
                 )
                 Route.Lists -> ListsScreen(
                     container = container,
@@ -312,6 +346,7 @@ private fun MainScaffold(
                     api = api,
                     onBack = back,
                     onOpenStatus = { id -> openStatus(id, null) },
+                    onReply = openReply,
                     onOpenHashtag = { name ->
                         navigate(
                             Route.StatusTimeline(
@@ -335,7 +370,8 @@ private fun MainScaffold(
                     accountId = current.accountId,
                     onBack = back,
                     onOpenAccount = openAccount,
-                    onOpenStatus = { id -> openStatus(id, null) }
+                    onOpenStatus = { id -> openStatus(id, null) },
+                    onReply = openReply
                 )
                 is Route.StatusTimeline -> StatusTimelineScreen(
                     api = api,
@@ -343,7 +379,8 @@ private fun MainScaffold(
                     title = current.title,
                     onBack = back,
                     onOpenAccount = openAccount,
-                    onOpenStatus = { id -> openStatus(id, null) }
+                    onOpenStatus = { id -> openStatus(id, null) },
+                    onReply = openReply
                 )
                 is Route.StatusDetail -> StatusDetailScreen(
                     api = detailApi,
@@ -351,7 +388,18 @@ private fun MainScaffold(
                     interactive = current.host.isNullOrBlank(),
                     onBack = back,
                     onOpenAccount = openAccount,
-                    onOpenStatus = { id -> openStatus(id, current.host) }
+                    onOpenStatus = { id -> openStatus(id, current.host) },
+                    onReply = openReply
+                )
+                is Route.ComposeReply -> ComposeScreen(
+                    api = api,
+                    giphyApi = container.giphyApi,
+                    translateApi = container.translateApi,
+                    draftStore = container.draftStore,
+                    preferences = container.preferences,
+                    replyTo = current.target,
+                    onBack = back,
+                    onPosted = back
                 )
             }
         }
@@ -360,6 +408,10 @@ private fun MainScaffold(
     if (moreOpen) {
         MoreMenuSheet(
             onDismiss = { moreOpen = false },
+            onAddAccount = {
+                moreOpen = false
+                onAddAccount()
+            },
             onNavigate = { destination ->
                 moreOpen = false
                 navigate(destination)

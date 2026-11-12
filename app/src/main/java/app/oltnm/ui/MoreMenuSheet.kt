@@ -15,6 +15,7 @@ import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FormatListBulleted
 import androidx.compose.material.icons.rounded.Newspaper
+import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.TrendingUp
@@ -40,6 +41,7 @@ import app.oltnm.ui.components.OltnSectionTitle
 @Composable
 fun MoreMenuSheet(
     onDismiss: () -> Unit,
+    onAddAccount: () -> Unit,
     onNavigate: (Route) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -140,6 +142,11 @@ fun MoreMenuSheet(
 
             Spacer(Modifier.height(8.dp))
             OltnSectionTitle(stringResource(R.string.settings_title))
+            MenuRow(
+                icon = Icons.Rounded.PersonAdd,
+                label = stringResource(R.string.add_account),
+                onClick = onAddAccount
+            )
             MenuRow(
                 icon = Icons.Rounded.Settings,
                 label = stringResource(R.string.settings_title),

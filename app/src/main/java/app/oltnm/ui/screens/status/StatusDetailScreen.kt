@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.oltnm.R
 import app.oltnm.data.api.MastodonApi
+import app.oltnm.data.model.Status
 import app.oltnm.ui.components.ErrorBanner
 import app.oltnm.ui.components.ErrorView
 import app.oltnm.ui.components.LoadingView
@@ -39,7 +40,8 @@ fun StatusDetailScreen(
     interactive: Boolean,
     onBack: () -> Unit,
     onOpenAccount: (String) -> Unit,
-    onOpenStatus: (String) -> Unit
+    onOpenStatus: (String) -> Unit,
+    onReply: (Status) -> Unit
 ) {
     val viewModel: StatusDetailViewModel = viewModel(
         key = "status-detail-${api.hashCode()}-$statusId",
@@ -106,6 +108,7 @@ fun StatusDetailScreen(
                                     status = status,
                                     onOpenAccount = accountCallback,
                                     onOpenStatus = {},
+                                    onReply = onReply,
                                     onOpenUrl = openUrl,
                                     onFavourite = viewModel::toggleFavourite,
                                     onReblog = viewModel::toggleReblog,
@@ -124,6 +127,7 @@ fun StatusDetailScreen(
                                         status = ancestor,
                                         onOpenAccount = accountCallback,
                                         onOpenStatus = { onOpenStatus(it.original.id) },
+                                        onReply = onReply,
                                         onOpenUrl = openUrl,
                                         onFavourite = viewModel::toggleFavourite,
                                         onReblog = viewModel::toggleReblog,
@@ -143,6 +147,7 @@ fun StatusDetailScreen(
                                         status = descendant,
                                         onOpenAccount = accountCallback,
                                         onOpenStatus = { onOpenStatus(it.original.id) },
+                                        onReply = onReply,
                                         onOpenUrl = openUrl,
                                         onFavourite = viewModel::toggleFavourite,
                                         onReblog = viewModel::toggleReblog,

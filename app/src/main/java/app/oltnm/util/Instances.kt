@@ -28,7 +28,8 @@ object Instances {
             "client_id" to clientId,
             "redirect_uri" to redirectUri,
             "response_type" to "code",
-            "scope" to scopes
+            "scope" to scopes,
+            "force_login" to "true"
         )
         val query = params.entries.joinToString("&") { (key, value) ->
             "$key=${URLEncoder.encode(value, "UTF-8")}"

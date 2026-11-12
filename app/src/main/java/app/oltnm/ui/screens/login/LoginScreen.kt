@@ -63,8 +63,14 @@ import app.oltnm.util.OAuthBus
 import coil3.compose.AsyncImage
 
 @Composable
-fun LoginScreen(container: AppContainer) {
+fun LoginScreen(
+    container: AppContainer,
+    viewModelKey: String = "login",
+    onCancel: (() -> Unit)? = null,
+    onSignedIn: (() -> Unit)? = null
+) {
     val viewModel: LoginViewModel = viewModel(
+        key = viewModelKey,
         factory = factoryOf { LoginViewModel(container.authRepository) }
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -72,6 +78,13 @@ fun LoginScreen(container: AppContainer) {
     val oauthError by OAuthBus.error.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val openUrl = rememberOpenUrl()
+
+    LaunchedEffect(viewModelKey) {
+        if (container.sessionStore.pending() == null) {
+            OAuthBus.consumeCode()
+            OAuthBus.consumeError()
+        }
+    }
 
     LaunchedEffect(state.authUrl) {
         val url = state.authUrl ?: return@LaunchedEffect
@@ -93,6 +106,13 @@ fun LoginScreen(container: AppContainer) {
         val value = oauthError ?: return@LaunchedEffect
         viewModel.showError(LoginError.Auth)
         OAuthBus.consumeError()
+    }
+
+    LaunchedEffect(state.signedIn) {
+        if (state.signedIn) {
+            viewModel.consumeSignedIn()
+            onSignedIn?.invoke()
+        }
     }
 
     val primary = MaterialTheme.colorScheme.primary
@@ -118,6 +138,17 @@ fun LoginScreen(container: AppContainer) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            if (onCancel != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    TextButton(onClick = onCancel) {
+                        Text(stringResource(R.string.back))
+                    }
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
 
             Box(contentAlignment = Alignment.Center) {

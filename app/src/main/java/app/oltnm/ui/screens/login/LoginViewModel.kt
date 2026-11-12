@@ -25,6 +25,7 @@ data class LoginUiState(
     val discovered: InstanceInfo? = null,
     val busy: Boolean = false,
     val authUrl: String? = null,
+    val signedIn: Boolean = false,
     val error: LoginError? = null
 )
 
@@ -69,7 +70,7 @@ class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
         val discovered = _state.value.discovered ?: return
         if (_state.value.busy) return
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, error = null) }
+            _state.update { it.copy(busy = true, signedIn = false, error = null) }
             runCatching {
                 authRepository.beginLogin(discovered.uri.ifBlank { _state.value.instanceInput })
             }
@@ -92,12 +93,16 @@ class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
             _state.update { it.copy(busy = true, error = null) }
             runCatching { authRepository.completeLogin(code) }
                 .onSuccess {
-                    _state.update { it.copy(busy = false) }
+                    _state.update { it.copy(busy = false, signedIn = true) }
                 }
                 .onFailure {
-                    _state.update { it.copy(busy = false, error = LoginError.Auth) }
+                    _state.update { it.copy(busy = false, signedIn = false, error = LoginError.Auth) }
                 }
         }
+    }
+
+    fun consumeSignedIn() {
+        _state.update { it.copy(signedIn = false) }
     }
 
     fun showError(error: LoginError) {

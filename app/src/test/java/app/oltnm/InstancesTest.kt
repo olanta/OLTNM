@@ -36,5 +36,6 @@ class InstancesTest {
         assertTrue(url.contains("redirect_uri=oltnm%3A%2F%2Foauth"))
         assertTrue(url.contains("response_type=code"))
         assertTrue(url.contains("scope=read+write+follow"))
+        assertTrue(url.contains("force_login=true"))
     }
 }

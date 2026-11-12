@@ -42,6 +42,7 @@ import app.oltnm.R
 import app.oltnm.data.api.MastodonApi
 import app.oltnm.data.model.Account
 import app.oltnm.data.model.NewsletterSource
+import app.oltnm.data.model.Status
 import app.oltnm.di.AppContainer
 import app.oltnm.ui.components.Avatar
 import app.oltnm.ui.components.EmptyView
@@ -59,7 +60,8 @@ fun NewsletterScreen(
     container: AppContainer,
     api: MastodonApi,
     onBack: () -> Unit,
-    onOpenStatus: (String) -> Unit
+    onOpenStatus: (String) -> Unit,
+    onReply: (Status) -> Unit
 ) {
     val viewModel: NewsletterViewModel = viewModel(
         key = "newsletter-${api.hashCode()}",
@@ -139,6 +141,7 @@ fun NewsletterScreen(
                             status = status,
                             onOpenAccount = {},
                             onOpenStatus = { onOpenStatus(it.original.id) },
+                            onReply = onReply,
                             onOpenUrl = openUrl,
                             onFavourite = {},
                             onReblog = {},

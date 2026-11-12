@@ -45,6 +45,8 @@
     <string name="back">Voltar</string>
 
     <string name="compose_title">Nova publicação</string>
+    <string name="compose_reply_title">Responder</string>
+    <string name="compose_replying_to">Respondendo a @%1$s</string>
     <string name="compose_post">Publicar</string>
     <string name="compose_content_warning">Aviso de conteúdo</string>
     <string name="compose_spoiler_hint">Texto do aviso</string>
@@ -66,6 +68,11 @@
 
     <string name="settings_title">Ajustes</string>
     <string name="settings_account">Conta</string>
+    <string name="accounts_title">Contas</string>
+    <string name="add_account">Adicionar conta</string>
+    <string name="account_current">Atual</string>
+    <string name="remove_account">Remover conta</string>
+    <string name="remove_account_confirm">Remover @%1$s deste dispositivo? Você pode adicioná-la novamente depois.</string>
     <string name="settings_session">Sessão</string>
     <string name="settings_instance">Instância</string>
     <string name="settings_version">Versão</string>
@@ -73,7 +80,7 @@
     <string name="settings_about">Sobre</string>
     <string name="settings_about_body">O OLTN Mobile é um cliente Mastodon gratuito e de código aberto para Android, feito em Kotlin e Jetpack Compose. Ele fala diretamente com a sua instância; não existe um backend do OLTN.</string>
     <string name="logout">Sair</string>
-    <string name="logout_confirm">O token da sua sessão será removido deste dispositivo. Você pode entrar de novo a qualquer momento.</string>
+    <string name="logout_confirm">Esta conta será removida deste dispositivo. As outras contas continuam conectadas.</string>
     <string name="cancel">Cancelar</string>
 
     <string name="login_title">Bem-vindo ao OLTN</string>

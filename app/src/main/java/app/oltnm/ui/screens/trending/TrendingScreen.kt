@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.oltnm.R
 import app.oltnm.data.api.MastodonApi
+import app.oltnm.data.model.Status
 import app.oltnm.data.model.Tag
 import app.oltnm.ui.components.EmptyView
 import app.oltnm.ui.components.LoadingView
@@ -59,7 +60,8 @@ fun TrendingScreen(
     api: MastodonApi,
     onBack: () -> Unit,
     onOpenHashtag: (String) -> Unit,
-    onOpenStatus: (String) -> Unit
+    onOpenStatus: (String) -> Unit,
+    onReply: (Status) -> Unit
 ) {
     val viewModel: TrendingViewModel = viewModel(
         key = "trending-${api.hashCode()}",
@@ -126,6 +128,7 @@ fun TrendingScreen(
                                 status = status,
                                 onOpenAccount = {},
                                 onOpenStatus = { onOpenStatus(it.original.id) },
+                                onReply = onReply,
                                 onOpenUrl = openUrl,
                                 onFavourite = {},
                                 onReblog = {},

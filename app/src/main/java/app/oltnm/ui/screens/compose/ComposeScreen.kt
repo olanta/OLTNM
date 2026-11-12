@@ -27,6 +27,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Audiotrack
 import androidx.compose.material.icons.rounded.Close
@@ -107,11 +108,19 @@ fun ComposeScreen(
     translateApi: TranslateApi,
     draftStore: DraftStore,
     preferences: PreferencesStore,
-    onPosted: () -> Unit
+    onPosted: () -> Unit,
+    replyTo: ReplyTarget? = null,
+    onBack: (() -> Unit)? = null
 ) {
     val viewModel: ComposeViewModel = viewModel(
-        key = "compose-${api.hashCode()}",
-        factory = factoryOf { ComposeViewModel(api, giphyApi, translateApi, draftStore) }
+        key = if (replyTo == null) {
+            "compose-${api.hashCode()}"
+        } else {
+            "compose-reply-${replyTo.statusId}"
+        },
+        factory = factoryOf {
+            ComposeViewModel(api, giphyApi, translateApi, draftStore, replyTo)
+        }
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
     val fontFamily by preferences.fontFamily.collectAsStateWithLifecycle()
@@ -227,7 +236,27 @@ fun ComposeScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         OltnTopBar(
-            title = { Text(stringResource(R.string.compose_title)) },
+            title = {
+                Text(
+                    stringResource(
+                        if (replyTo == null) {
+                            R.string.compose_title
+                        } else {
+                            R.string.compose_reply_title
+                        }
+                    )
+                )
+            },
+            navigationIcon = {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.back)
+                        )
+                    }
+                }
+            },
             actions = {
                 OltnPrimaryButton(
                     text = postLabel,
@@ -246,6 +275,14 @@ fun ComposeScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
+            replyTo?.let { target ->
+                Text(
+                    text = stringResource(R.string.compose_replying_to, target.acct),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
             OltnGlassCard(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(16.dp)

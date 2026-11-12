@@ -58,6 +58,7 @@ fun StatusCard(
     status: Status,
     onOpenAccount: (String) -> Unit,
     onOpenStatus: (Status) -> Unit,
+    onReply: (Status) -> Unit,
     onOpenUrl: (String) -> Unit,
     onFavourite: (Status) -> Unit,
     onReblog: (Status) -> Unit,
@@ -205,7 +206,7 @@ fun StatusCard(
                 StatusActions(
                     status = displayed,
                     onOpenUrl = onOpenUrl,
-                    onOpenStatus = { onOpenStatus(displayed) },
+                    onReply = { onReply(displayed) },
                     onFavourite = { onFavourite(status) },
                     onReblog = { onReblog(status) },
                     interactive = interactive
@@ -287,7 +288,7 @@ private fun rememberStatusText(body: String, emojis: List<Emoji>): EmojiTextData
 private fun StatusActions(
     status: Status,
     onOpenUrl: (String) -> Unit,
-    onOpenStatus: () -> Unit,
+    onReply: () -> Unit,
     onFavourite: () -> Unit,
     onReblog: () -> Unit,
     interactive: Boolean
@@ -305,7 +306,7 @@ private fun StatusActions(
                 tint = semantics.reply,
                 active = false,
                 contentDescription = stringResource(R.string.action_reply),
-                onClick = onOpenStatus
+                onClick = onReply
             )
             StatusAction(
                 icon = Icons.Rounded.Repeat,

@@ -81,7 +81,8 @@ class ComposeViewModel(
     private val api: MastodonApi,
     private val giphyApi: GiphyApi,
     private val translateApi: TranslateApi,
-    private val draftStore: DraftStore
+    private val draftStore: DraftStore,
+    private val replyTo: ReplyTarget? = null
 ) : ViewModel() {
     private val _state = MutableStateFlow(ComposeUiState())
     val state: StateFlow<ComposeUiState> = _state.asStateFlow()
@@ -89,14 +90,24 @@ class ComposeViewModel(
     private var draftJob: Job? = null
 
     init {
-        draftStore.load()?.let { draft ->
+        val target = replyTo
+        if (target == null) {
+            draftStore.load()?.let { draft ->
+                _state.update {
+                    it.copy(
+                        text = draft.text,
+                        spoiler = draft.spoiler,
+                        spoilerEnabled = draft.spoilerEnabled,
+                        visibility = runCatching { Visibility.valueOf(draft.visibility) }
+                            .getOrDefault(Visibility.Public)
+                    )
+                }
+            }
+        } else {
             _state.update {
                 it.copy(
-                    text = draft.text,
-                    spoiler = draft.spoiler,
-                    spoilerEnabled = draft.spoilerEnabled,
-                    visibility = runCatching { Visibility.valueOf(draft.visibility) }
-                        .getOrDefault(Visibility.Public)
+                    text = target.initialText,
+                    visibility = target.visibility
                 )
             }
         }
@@ -338,6 +349,7 @@ class ComposeViewModel(
                     status = parts.first(),
                     visibility = visibility.apiValue,
                     spoilerText = if (snapshot.spoilerEnabled) snapshot.spoiler.trim() else "",
+                    inReplyToId = replyTo?.statusId,
                     sensitive = snapshot.sensitive,
                     mediaIds = mediaIds,
                     poll = poll,
@@ -358,7 +370,7 @@ class ComposeViewModel(
                 return@launch
             }
 
-            var replyToId: String? = null
+            var replyToId: String? = replyTo?.statusId
             var postedCount = 0
             var failed = false
             for ((index, part) in parts.withIndex()) {
@@ -570,10 +582,12 @@ class ComposeViewModel(
     fun consumePosted() {
         val current = _state.value
         _state.value = ComposeUiState(
+            text = replyTo?.initialText.orEmpty(),
+            visibility = replyTo?.visibility ?: Visibility.Public,
             maxChars = current.maxChars,
             localVisibilitySupported = current.localVisibilitySupported
         )
-        draftStore.clear()
+        if (replyTo == null) draftStore.clear()
     }
 
     fun clearError() {
@@ -581,6 +595,7 @@ class ComposeViewModel(
     }
 
     private fun scheduleDraftSave() {
+        if (replyTo != null) return
         draftJob?.cancel()
         draftJob = viewModelScope.launch {
             delay(600)

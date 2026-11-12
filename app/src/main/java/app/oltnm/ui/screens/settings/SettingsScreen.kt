@@ -26,8 +26,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.oltnm.BuildConfig
@@ -69,9 +73,12 @@ fun SettingsScreen(
     container: AppContainer,
     session: Session,
     onLogout: () -> Unit,
+    onAddAccount: () -> Unit,
     onBack: (() -> Unit)? = null
 ) {
     var confirmLogout by remember { mutableStateOf(false) }
+    var pendingRemoval by remember { mutableStateOf<Session?>(null) }
+    val sessions by container.sessionStore.sessions.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = context as? Activity
     val themeMode by container.preferences.themeMode.collectAsStateWithLifecycle()
@@ -312,12 +319,45 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(20.dp))
-            OltnSectionTitle(stringResource(R.string.settings_account))
+            OltnSectionTitle(stringResource(R.string.accounts_title))
             Spacer(Modifier.height(8.dp))
             OltnGlassCard(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(16.dp)
             ) {
+                val accounts = sessions.ifEmpty { listOf(session) }
+                accounts.forEachIndexed { index, account ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                    }
+                    AccountRow(
+                        account = account,
+                        current = account.key == session.key,
+                        onSelect = { container.sessionStore.selectSession(account.key) },
+                        onRemove = { pendingRemoval = account }
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onAddAccount,
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.PersonAdd,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.add_account),
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
                 SettingsRow(stringResource(R.string.settings_instance), session.host)
                 SettingsRow(
                     stringResource(R.string.settings_version),
@@ -377,6 +417,82 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+
+    pendingRemoval?.let { target ->
+        AlertDialog(
+            onDismissRequest = { pendingRemoval = null },
+            title = { Text(stringResource(R.string.remove_account)) },
+            text = { Text(stringResource(R.string.remove_account_confirm, target.acct)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingRemoval = null
+                        container.sessionStore.removeSession(target.key)
+                    }
+                ) {
+                    Text(stringResource(R.string.remove))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingRemoval = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun AccountRow(
+    account: Session,
+    current: Boolean,
+    onSelect: () -> Unit,
+    onRemove: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onSelect)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Avatar(url = account.avatar, size = 42.dp)
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = account.displayName,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = account.handle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (current) {
+            Text(
+                text = stringResource(R.string.account_current),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.width(4.dp))
+        }
+        IconButton(onClick = onRemove) {
+            Icon(
+                imageVector = Icons.Rounded.Delete,
+                contentDescription = stringResource(R.string.remove_account),
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 

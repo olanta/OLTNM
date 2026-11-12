@@ -39,6 +39,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.oltnm.R
 import app.oltnm.data.api.MastodonApi
 import app.oltnm.data.model.Account
+import app.oltnm.data.model.Status
 import app.oltnm.ui.components.Avatar
 import app.oltnm.ui.components.ErrorBanner
 import app.oltnm.ui.components.ErrorView
@@ -61,7 +62,8 @@ fun ProfileScreen(
     accountId: String,
     onBack: () -> Unit,
     onOpenAccount: (String) -> Unit,
-    onOpenStatus: (String) -> Unit
+    onOpenStatus: (String) -> Unit,
+    onReply: (Status) -> Unit
 ) {
     val viewModel: ProfileViewModel = viewModel(key = "profile-${api.hashCode()}-$accountId", factory = factoryOf { ProfileViewModel(api, accountId) })
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -133,6 +135,7 @@ fun ProfileScreen(
                                 status = status,
                                 onOpenAccount = onOpenAccount,
                                 onOpenStatus = { onOpenStatus(it.original.id) },
+                                onReply = onReply,
                                 onOpenUrl = openUrl,
                                 onFavourite = viewModel::toggleFavourite,
                                 onReblog = viewModel::toggleReblog

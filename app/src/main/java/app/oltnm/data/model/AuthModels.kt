@@ -68,4 +68,10 @@ data class Session(
     val acct: String,
     @SerialName("display_name") val displayName: String,
     val avatar: String
-)
+) {
+    val key: String
+        get() = "$host#$accountId"
+
+    val handle: String
+        get() = if (acct.contains('@')) "@$acct" else "@$acct@$host"
+}

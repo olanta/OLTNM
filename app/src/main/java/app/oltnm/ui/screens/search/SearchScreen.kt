@@ -43,6 +43,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.oltnm.R
 import app.oltnm.data.api.MastodonApi
 import app.oltnm.data.model.Account
+import app.oltnm.data.model.Status
 import app.oltnm.data.model.Tag
 import app.oltnm.ui.components.Avatar
 import app.oltnm.ui.components.EmptyView
@@ -68,7 +69,8 @@ private enum class SearchTab(@StringRes val labelRes: Int) {
 fun SearchScreen(
     api: MastodonApi,
     onOpenAccount: (String) -> Unit,
-    onOpenStatus: (String) -> Unit
+    onOpenStatus: (String) -> Unit,
+    onReply: (Status) -> Unit
 ) {
     val viewModel: SearchViewModel = viewModel(
         key = "search-${api.hashCode()}",
@@ -154,6 +156,7 @@ fun SearchScreen(
                                     status = status,
                                     onOpenAccount = onOpenAccount,
                                     onOpenStatus = { onOpenStatus(it.original.id) },
+                                    onReply = onReply,
                                     onOpenUrl = openUrl,
                                     onFavourite = viewModel::toggleFavourite,
                                     onReblog = viewModel::toggleReblog
