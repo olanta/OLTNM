@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material3.AlertDialog
@@ -74,6 +75,7 @@ fun SettingsScreen(
     session: Session,
     onLogout: () -> Unit,
     onAddAccount: () -> Unit,
+    onOpenDiagnostics: () -> Unit,
     onBack: (() -> Unit)? = null
 ) {
     var confirmLogout by remember { mutableStateOf(false) }
@@ -374,6 +376,24 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onOpenDiagnostics,
+                shape = RoundedCornerShape(999.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.BugReport,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.diagnostics),
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
 
             Spacer(Modifier.height(28.dp))
             OutlinedButton(

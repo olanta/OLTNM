@@ -8,6 +8,7 @@ import app.oltnm.data.model.PendingLogin
 import app.oltnm.data.model.Session
 import app.oltnm.data.store.SessionStore
 import app.oltnm.util.Instances
+import app.oltnm.util.OltnLog
 import okhttp3.OkHttpClient
 
 class AuthRepository(
@@ -17,6 +18,7 @@ class AuthRepository(
     suspend fun discover(rawInstance: String): InstanceInfo {
         val host = Instances.normalize(rawInstance)
             ?: throw IllegalArgumentException("Enter a valid instance, for example mastodon.social")
+        OltnLog.d("Discovering instance $host")
         return MastodonApi.fetchInstance(host, http)
     }
 
@@ -36,6 +38,7 @@ class AuthRepository(
                 clientSecret = registration.clientSecret
             )
         )
+        OltnLog.i("Starting sign-in for $host")
         return Instances.authorizeUrl(
             host = host,
             clientId = registration.clientId,
@@ -73,6 +76,7 @@ class AuthRepository(
         )
         sessionStore.saveSession(session)
         sessionStore.clearPending()
+        OltnLog.i("Signed in as ${session.handle} on ${session.host}")
         return session
     }
 }

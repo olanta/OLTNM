@@ -13,6 +13,7 @@ object HttpClient {
     }
 
     val shared: OkHttpClient = OkHttpClient.Builder()
+        .addInterceptor(NetworkLoggingInterceptor())
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)

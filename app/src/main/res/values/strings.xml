@@ -78,6 +78,14 @@
     <string name="settings_version">Version</string>
     <string name="settings_client">Client</string>
     <string name="settings_about">About</string>
+    <string name="diagnostics">Diagnostics</string>
+    <string name="diagnostics_title">Diagnostics</string>
+    <string name="diagnostics_logs">Recent logs</string>
+    <string name="diagnostics_crashes">Crash reports</string>
+    <string name="diagnostics_empty">No logs yet.</string>
+    <string name="diagnostics_no_crashes">No crash reports.</string>
+    <string name="diagnostics_share">Share diagnostics</string>
+    <string name="diagnostics_clear">Clear</string>
     <string name="settings_about_body">OLTN Mobile is a free, open-source Mastodon client for Android, built in Kotlin and Jetpack Compose. It talks directly to your instance; there is no OLTN backend.</string>
     <string name="logout">Sign out</string>
     <string name="logout_confirm">This account will be removed from this device. Any other accounts stay signed in.</string>

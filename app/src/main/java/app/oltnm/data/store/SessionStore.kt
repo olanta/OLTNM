@@ -4,6 +4,7 @@ import android.content.Context
 import app.oltnm.data.api.JsonConfig
 import app.oltnm.data.model.PendingLogin
 import app.oltnm.data.model.Session
+import app.oltnm.util.OltnLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +26,7 @@ class SessionStore(context: Context) {
         val next = _sessions.value.filterNot { it.key == value.key } + value
         persist(next)
         _sessions.value = next
+        OltnLog.i("Account added: ${value.handle}")
         selectSession(value.key)
     }
 
@@ -32,12 +34,15 @@ class SessionStore(context: Context) {
         val target = _sessions.value.firstOrNull { it.key == key } ?: return
         prefs.edit().putString(KEY_CURRENT, key).apply()
         _session.value = target
+        OltnLog.d("Account selected: ${target.handle}")
     }
 
     fun removeSession(key: String) {
+        val removed = _sessions.value.firstOrNull { it.key == key }
         val next = _sessions.value.filterNot { it.key == key }
         persist(next)
         _sessions.value = next
+        removed?.let { OltnLog.i("Account removed: ${it.handle}") }
         if (_session.value?.key == key) {
             val replacement = next.firstOrNull()
             if (replacement == null) {
@@ -61,6 +66,7 @@ class SessionStore(context: Context) {
             .apply()
         _sessions.value = emptyList()
         _session.value = null
+        OltnLog.i("All accounts removed")
     }
 
     fun savePending(value: PendingLogin) {

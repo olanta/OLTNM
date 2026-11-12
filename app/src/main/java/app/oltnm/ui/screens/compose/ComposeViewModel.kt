@@ -15,6 +15,7 @@ import app.oltnm.data.model.Visibility
 import app.oltnm.data.store.ComposeDraftData
 import app.oltnm.data.store.DraftStore
 import app.oltnm.util.CodeImage
+import app.oltnm.util.OltnLog
 import app.oltnm.util.ThreadText
 import java.time.Instant
 import kotlinx.coroutines.Job
@@ -291,6 +292,10 @@ class ComposeViewModel(
         } else {
             snapshot.quotePolicy.apiValue
         }
+        OltnLog.d(
+            "Compose submit reply=${replyTo != null} scheduled=${scheduledAt != null} " +
+                "media=${snapshot.media.size} poll=${poll != null} partsLimit=${snapshot.maxChars}"
+        )
 
         viewModelScope.launch {
             _state.update { it.copy(posting = true, error = null) }
@@ -358,11 +363,13 @@ class ComposeViewModel(
                 )
                 runCatching { api.scheduleStatus(request) }
                     .onSuccess {
+                        OltnLog.i("Post scheduled reply=${replyTo != null}")
                         _state.update {
                             it.copy(posting = false, posted = true, scheduled = true)
                         }
                     }
-                    .onFailure {
+                    .onFailure { error ->
+                        OltnLog.w("Scheduled post failed: ${error.javaClass.simpleName}")
                         _state.update {
                             it.copy(posting = false, error = ComposeError.Generic)
                         }
@@ -398,6 +405,7 @@ class ComposeViewModel(
             }
 
             if (failed) {
+                OltnLog.w("Post failed after $postedCount part(s)")
                 val remaining = if (postedCount == 0) {
                     snapshot.text
                 } else {
@@ -407,6 +415,7 @@ class ComposeViewModel(
                     it.copy(posting = false, text = remaining, error = ComposeError.Generic)
                 }
             } else {
+                OltnLog.i("Post published parts=$postedCount reply=${replyTo != null}")
                 _state.update {
                     it.copy(posting = false, posted = true, scheduled = false)
                 }

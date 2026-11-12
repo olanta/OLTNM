@@ -46,6 +46,7 @@ import app.oltnm.data.model.TimelineTypes
 import app.oltnm.di.AppContainer
 import app.oltnm.ui.screens.compose.ComposeScreen
 import app.oltnm.ui.screens.compose.ReplyTarget
+import app.oltnm.ui.screens.diagnostics.DiagnosticsScreen
 import app.oltnm.ui.screens.home.StatusTimelineScreen
 import app.oltnm.ui.screens.home.TimelineScreen
 import app.oltnm.ui.screens.lists.ListsScreen
@@ -73,6 +74,7 @@ sealed interface Route {
     data object Lists : Route
     data object Trending : Route
     data object Scheduled : Route
+    data object Diagnostics : Route
     data class Profile(val accountId: String) : Route
     data class StatusTimeline(val spec: TimelineSpec, val title: String) : Route
     data class StatusDetail(val statusId: String, val host: String? = null) : Route
@@ -310,6 +312,7 @@ private fun MainScaffold(
                     session = session,
                     onLogout = onLogout,
                     onAddAccount = onAddAccount,
+                    onOpenDiagnostics = { navigate(Route.Diagnostics) },
                     onBack = back
                 )
                 Route.ManageTimelines -> ManageTimelinesScreen(
@@ -365,6 +368,7 @@ private fun MainScaffold(
                     api = api,
                     onBack = back
                 )
+                Route.Diagnostics -> DiagnosticsScreen(onBack = back)
                 is Route.Profile -> ProfileScreen(
                     api = api,
                     accountId = current.accountId,
