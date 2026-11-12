@@ -1,5 +1,7 @@
 # OLTNM
 
+[![CI](https://github.com/olanta/OLTNM/actions/workflows/ci.yml/badge.svg)](https://github.com/olanta/OLTNM/actions/workflows/ci.yml)
+
 OLTN Mobile is the native Android client for **OLTN**, a Mastodon/fediverse
 client. OLTNM talks directly to the user's instance; there is no OLTN backend.
 

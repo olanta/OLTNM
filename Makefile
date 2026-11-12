@@ -77,7 +77,7 @@ SYSTEM_IMAGE ?= system-images;android-36;google_apis;x86_64
 DEBUG_ACTIVITY := app.oltnm.debug/app.oltnm.MainActivity
 
 .DEFAULT_GOAL := help
-.PHONY: help sdk emulator-sdk licenses avd avds emulator wait-device build build-release install run run-emu devices test validate lint format format-check emojis clean doctor check-sdk
+.PHONY: help sdk emulator-sdk licenses avd avds emulator wait-device build build-release install run run-emu devices test validate ci lint format format-check emojis clean doctor check-sdk
 
 help:
 	@echo Targets:
@@ -94,6 +94,7 @@ help:
 	@echo   make devices        list connected Android devices
 	@echo   make test           run the JVM unit tests
 	@echo   make validate       build + unit tests + lint (no device needed)
+	@echo   make ci             run the GitHub Actions validation locally
 	@echo   make lint           run ktlint and Android lint
 	@echo   make format         auto-format Kotlin sources with ktlint
 	@echo   make format-check   fail if Kotlin sources are not formatted
@@ -178,6 +179,9 @@ test: check-sdk
 	$(GRADLEW) :app:testDebugUnitTest
 
 validate: build test lint
+
+ci: check-sdk
+	$(GRADLEW) :app:testDebugUnitTest :app:ktlintCheck :app:lintDebug :app:assembleDebug
 
 lint: check-sdk
 	$(GRADLEW) :app:ktlintCheck :app:lintDebug
