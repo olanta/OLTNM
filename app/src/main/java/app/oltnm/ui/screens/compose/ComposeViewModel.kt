@@ -9,12 +9,14 @@ import app.oltnm.data.api.TranslateApi
 import app.oltnm.data.model.Emoji
 import app.oltnm.data.model.PollRequest
 import app.oltnm.data.model.QuotePolicy
+import app.oltnm.data.model.Status
 import app.oltnm.data.model.StatusRequest
 import app.oltnm.data.model.UploadedMedia
 import app.oltnm.data.model.Visibility
 import app.oltnm.data.store.ComposeDraftData
 import app.oltnm.data.store.DraftStore
 import app.oltnm.util.CodeImage
+import app.oltnm.util.HtmlText
 import app.oltnm.util.OltnLog
 import app.oltnm.util.ThreadText
 import java.time.Instant
@@ -83,7 +85,8 @@ class ComposeViewModel(
     private val giphyApi: GiphyApi,
     private val translateApi: TranslateApi,
     private val draftStore: DraftStore,
-    private val replyTo: ReplyTarget? = null
+    private val replyTo: ReplyTarget? = null,
+    private val editStatus: Status? = null
 ) : ViewModel() {
     private val _state = MutableStateFlow(ComposeUiState())
     val state: StateFlow<ComposeUiState> = _state.asStateFlow()
@@ -92,24 +95,55 @@ class ComposeViewModel(
 
     init {
         val target = replyTo
-        if (target == null) {
-            draftStore.load()?.let { draft ->
+        val editing = editStatus
+        when {
+            editing != null -> {
+                val original = editing.original
                 _state.update {
                     it.copy(
-                        text = draft.text,
-                        spoiler = draft.spoiler,
-                        spoilerEnabled = draft.spoilerEnabled,
-                        visibility = runCatching { Visibility.valueOf(draft.visibility) }
-                            .getOrDefault(Visibility.Public)
+                        text = HtmlText.plain(
+                            original.content,
+                            original.emojis
+                                .filter { emoji -> emoji.url.isNotBlank() }
+                                .map { emoji -> emoji.shortcode }
+                                .toSet()
+                        ),
+                        visibility = Visibility.fromApi(original.visibility),
+                        spoilerEnabled = original.spoilerText.isNotBlank(),
+                        spoiler = original.spoilerText,
+                        sensitive = original.sensitive,
+                        media = original.mediaAttachments.map { attachment ->
+                            UploadedMedia(
+                                id = attachment.id,
+                                url = attachment.url,
+                                previewUrl = attachment.previewUrl,
+                                description = attachment.description,
+                                type = attachment.type
+                            )
+                        }
                     )
                 }
             }
-        } else {
-            _state.update {
-                it.copy(
-                    text = target.initialText,
-                    visibility = target.visibility
-                )
+            target == null -> {
+                draftStore.load()?.let { draft ->
+                    _state.update {
+                        it.copy(
+                            text = draft.text,
+                            spoiler = draft.spoiler,
+                            spoilerEnabled = draft.spoilerEnabled,
+                            visibility = runCatching { Visibility.valueOf(draft.visibility) }
+                                .getOrDefault(Visibility.Public)
+                        )
+                    }
+                }
+            }
+            else -> {
+                _state.update {
+                    it.copy(
+                        text = target.initialText,
+                        visibility = target.visibility
+                    )
+                }
             }
         }
         loadInstanceDetails()
@@ -292,6 +326,48 @@ class ComposeViewModel(
         } else {
             snapshot.quotePolicy.apiValue
         }
+
+        val editing = editStatus
+        if (editing != null) {
+            val text = snapshot.text.trim()
+            if (text.length > snapshot.maxChars) {
+                _state.update { it.copy(error = ComposeError.TooLong) }
+                return
+            }
+            OltnLog.d("Compose edit id=${editing.id} media=${snapshot.media.size}")
+            viewModelScope.launch {
+                _state.update { it.copy(posting = true, error = null) }
+                val syncedMedia = snapshot.media.map { item ->
+                    runCatching {
+                        api.updateMediaDescription(item.id, item.description.orEmpty())
+                    }.getOrDefault(item)
+                }
+                val payload = StatusRequest(
+                    status = text,
+                    visibility = visibility.apiValue,
+                    spoilerText = if (snapshot.spoilerEnabled) snapshot.spoiler.trim() else "",
+                    sensitive = snapshot.sensitive,
+                    mediaIds = syncedMedia.map { it.id }
+                )
+                runCatching { api.updateStatus(editing.id, payload) }
+                    .onSuccess {
+                        OltnLog.i("Post updated id=${editing.id}")
+                        _state.update {
+                            it.copy(posting = false, posted = true, scheduled = false)
+                        }
+                    }
+                    .onFailure { error ->
+                        OltnLog.w(
+                            "Post update failed id=${editing.id}: ${error.javaClass.simpleName}"
+                        )
+                        _state.update {
+                            it.copy(posting = false, error = ComposeError.Generic)
+                        }
+                    }
+            }
+            return
+        }
+
         OltnLog.d(
             "Compose submit reply=${replyTo != null} scheduled=${scheduledAt != null} " +
                 "media=${snapshot.media.size} poll=${poll != null} partsLimit=${snapshot.maxChars}"
@@ -590,6 +666,10 @@ class ComposeViewModel(
 
     fun consumePosted() {
         val current = _state.value
+        if (editStatus != null) {
+            _state.value = current.copy(posting = false, posted = false, error = null)
+            return
+        }
         _state.value = ComposeUiState(
             text = replyTo?.initialText.orEmpty(),
             visibility = replyTo?.visibility ?: Visibility.Public,
@@ -604,7 +684,7 @@ class ComposeViewModel(
     }
 
     private fun scheduleDraftSave() {
-        if (replyTo != null) return
+        if (replyTo != null || editStatus != null) return
         draftJob?.cancel()
         draftJob = viewModelScope.launch {
             delay(600)

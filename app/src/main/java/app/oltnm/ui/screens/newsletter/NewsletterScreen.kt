@@ -145,6 +145,7 @@ fun NewsletterScreen(
                             onOpenUrl = openUrl,
                             onFavourite = {},
                             onReblog = {},
+                            onBookmark = {},
                             interactive = false
                         )
                     }

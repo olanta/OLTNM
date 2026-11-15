@@ -11,13 +11,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+enum class ModerationEvent {
+    Blocked,
+    Reported
+}
+
 data class StatusDetailUiState(
     val status: Status? = null,
     val ancestors: List<Status> = emptyList(),
     val descendants: List<Status> = emptyList(),
     val loading: Boolean = true,
     val refreshing: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val actionError: String? = null,
+    val moderationEvent: ModerationEvent? = null
 )
 
 class StatusDetailViewModel(
@@ -126,6 +133,67 @@ class StatusDetailViewModel(
                     _state.update { it.copy(error = error.userMessage()) }
                 }
         }
+    }
+
+    fun toggleBookmark(status: Status) {
+        if (!interactive) return
+        val target = status.original
+        val next = !target.bookmarked
+        updateStatus(target.id) { it.copy(bookmarked = next) }
+        viewModelScope.launch {
+            runCatching {
+                if (next) api.bookmark(target.id) else api.unbookmark(target.id)
+            }
+                .onSuccess { server -> updateStatus(server.id) { server } }
+                .onFailure { error ->
+                    updateStatus(target.id) { it.copy(bookmarked = !next) }
+                    _state.update { it.copy(error = error.userMessage()) }
+                }
+        }
+    }
+
+    fun blockAccount(accountId: String) {
+        if (!interactive) return
+        viewModelScope.launch {
+            runCatching { api.blockAccount(accountId) }
+                .onSuccess {
+                    _state.update {
+                        it.copy(
+                            moderationEvent = ModerationEvent.Blocked,
+                            actionError = null
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _state.update { it.copy(actionError = error.userMessage()) }
+                }
+        }
+    }
+
+    fun reportAccount(accountId: String, statusId: String?, comment: String) {
+        if (!interactive) return
+        viewModelScope.launch {
+            runCatching { api.reportAccount(accountId, statusId, comment) }
+                .onSuccess {
+                    _state.update {
+                        it.copy(
+                            moderationEvent = ModerationEvent.Reported,
+                            actionError = null
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _state.update { it.copy(actionError = error.userMessage()) }
+                }
+        }
+    }
+
+    fun clearModerationEvent() {
+        _state.update { it.copy(moderationEvent = null) }
+    }
+
+    fun clearActionError() {
+        _state.update { it.copy(actionError = null) }
     }
 
     fun clearError() {

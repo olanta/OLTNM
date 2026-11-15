@@ -79,6 +79,7 @@ sealed interface Route {
     data class StatusTimeline(val spec: TimelineSpec, val title: String) : Route
     data class StatusDetail(val statusId: String, val host: String? = null) : Route
     data class ComposeReply(val target: ReplyTarget) : Route
+    data class EditStatus(val status: Status) : Route
 }
 
 private data class Tab(
@@ -155,6 +156,7 @@ private fun MainScaffold(
     val stack = remember { mutableStateListOf<Route>(Route.Home) }
     val route = stack.last()
     var moreOpen by remember { mutableStateOf(false) }
+    var composeNonce by rememberSaveable { mutableStateOf(0) }
 
     val select: (Route) -> Unit = { next ->
         stack.clear()
@@ -204,7 +206,10 @@ private fun MainScaffold(
                     val isCompose = tab.route == Route.Compose
                     NavigationBarItem(
                         selected = route == tab.route,
-                        onClick = { select(tab.route) },
+                        onClick = {
+                            if (tab.route == Route.Compose) composeNonce += 1
+                            select(tab.route)
+                        },
                         icon = {
                             if (isCompose) {
                                 Box(
@@ -300,6 +305,7 @@ private fun MainScaffold(
                     translateApi = container.translateApi,
                     draftStore = container.draftStore,
                     preferences = container.preferences,
+                    sessionKey = composeNonce,
                     onPosted = { select(Route.Home) }
                 )
                 Route.Notifications -> NotificationsScreen(
@@ -390,10 +396,12 @@ private fun MainScaffold(
                     api = detailApi,
                     statusId = current.statusId,
                     interactive = current.host.isNullOrBlank(),
+                    currentAccountId = session.accountId,
                     onBack = back,
                     onOpenAccount = openAccount,
                     onOpenStatus = { id -> openStatus(id, current.host) },
-                    onReply = openReply
+                    onReply = openReply,
+                    onEdit = { status -> navigate(Route.EditStatus(status)) }
                 )
                 is Route.ComposeReply -> ComposeScreen(
                     api = api,
@@ -402,6 +410,16 @@ private fun MainScaffold(
                     draftStore = container.draftStore,
                     preferences = container.preferences,
                     replyTo = current.target,
+                    onBack = back,
+                    onPosted = back
+                )
+                is Route.EditStatus -> ComposeScreen(
+                    api = api,
+                    giphyApi = container.giphyApi,
+                    translateApi = container.translateApi,
+                    draftStore = container.draftStore,
+                    preferences = container.preferences,
+                    editStatus = current.status,
                     onBack = back,
                     onPosted = back
                 )

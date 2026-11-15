@@ -22,10 +22,21 @@
     <string name="ancestors_title">Em resposta a</string>
     <string name="descendants_title">Respostas</string>
     <string name="action_reply">Responder</string>
+    <string name="edit">Editar</string>
     <string name="action_boost">Republicar</string>
     <string name="action_favourite">Favoritar</string>
+    <string name="action_bookmark">Salvar</string>
+    <string name="block_user">Bloquear @%1$s</string>
+    <string name="block_user_confirm">As publicações e notificações dessa conta serão ocultadas de você.</string>
+    <string name="block">Bloquear</string>
+    <string name="report_user">Denunciar @%1$s</string>
+    <string name="report_comment_hint">Adicione um comentário (opcional)</string>
+    <string name="report">Denunciar</string>
+    <string name="user_blocked">Usuário bloqueado</string>
+    <string name="report_sent">Denúncia enviada</string>
     <string name="share">Compartilhar</string>
     <string name="more_media">+%1$d mídias</string>
+    <string name="media_audio">Áudio</string>
     <string name="poll_votes">%1$d votos</string>
 
     <string name="notifications_title">Notificações</string>
@@ -45,9 +56,13 @@
     <string name="back">Voltar</string>
 
     <string name="compose_title">Nova publicação</string>
+    <string name="compose_edit_title">Editar publicação</string>
     <string name="compose_reply_title">Responder</string>
     <string name="compose_replying_to">Respondendo a @%1$s</string>
     <string name="compose_post">Publicar</string>
+    <string name="updated">Atualizado</string>
+    <string name="paste">Colar</string>
+    <string name="paste_empty">Nada para colar.</string>
     <string name="compose_content_warning">Aviso de conteúdo</string>
     <string name="compose_spoiler_hint">Texto do aviso</string>
     <string name="compose_hint">Compartilhe seus pensamentos</string>

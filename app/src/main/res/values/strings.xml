@@ -22,10 +22,21 @@
     <string name="ancestors_title">In reply to</string>
     <string name="descendants_title">Replies</string>
     <string name="action_reply">Reply</string>
+    <string name="edit">Edit</string>
     <string name="action_boost">Boost</string>
     <string name="action_favourite">Favourite</string>
+    <string name="action_bookmark">Bookmark</string>
+    <string name="block_user">Block @%1$s</string>
+    <string name="block_user_confirm">Their posts and notifications will be hidden from you.</string>
+    <string name="block">Block</string>
+    <string name="report_user">Report @%1$s</string>
+    <string name="report_comment_hint">Add a comment (optional)</string>
+    <string name="report">Report</string>
+    <string name="user_blocked">User blocked</string>
+    <string name="report_sent">Report sent</string>
     <string name="share">Share</string>
     <string name="more_media">+%1$d more</string>
+    <string name="media_audio">Audio</string>
     <string name="poll_votes">%1$d votes</string>
 
     <string name="notifications_title">Notifications</string>
@@ -45,9 +56,13 @@
     <string name="back">Back</string>
 
     <string name="compose_title">New post</string>
+    <string name="compose_edit_title">Edit post</string>
     <string name="compose_reply_title">Reply</string>
     <string name="compose_replying_to">Replying to @%1$s</string>
     <string name="compose_post">Post</string>
+    <string name="updated">Updated</string>
+    <string name="paste">Paste</string>
+    <string name="paste_empty">Nothing to paste.</string>
     <string name="compose_content_warning">Content warning</string>
     <string name="compose_spoiler_hint">Content warning text</string>
     <string name="compose_hint">Share your thoughts</string>

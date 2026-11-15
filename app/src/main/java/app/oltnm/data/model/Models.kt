@@ -1,5 +1,9 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package app.oltnm.data.model
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -160,13 +164,21 @@ data class ScheduledStatus(
 )
 
 @Serializable
+data class ReportRequest(
+    @SerialName("account_id") val accountId: String,
+    @SerialName("status_ids") val statusIds: List<String> = emptyList(),
+    val comment: String = "",
+    val forward: Boolean = false
+)
+
+@Serializable
 data class StatusRequest(
     val status: String,
-    val visibility: String = "public",
-    @SerialName("spoiler_text") val spoilerText: String = "",
+    @EncodeDefault val visibility: String = "public",
+    @EncodeDefault @SerialName("spoiler_text") val spoilerText: String = "",
     @SerialName("in_reply_to_id") val inReplyToId: String? = null,
-    val sensitive: Boolean = false,
-    @SerialName("media_ids") val mediaIds: List<String> = emptyList(),
+    @EncodeDefault val sensitive: Boolean = false,
+    @EncodeDefault @SerialName("media_ids") val mediaIds: List<String> = emptyList(),
     val poll: PollRequest? = null,
     @SerialName("scheduled_at") val scheduledAt: String? = null,
     @SerialName("quoted_status_id") val quotedStatusId: String? = null,

@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -39,9 +41,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -62,6 +67,7 @@ fun StatusCard(
     onOpenUrl: (String) -> Unit,
     onFavourite: (Status) -> Unit,
     onReblog: (Status) -> Unit,
+    onBookmark: (Status) -> Unit,
     modifier: Modifier = Modifier,
     interactive: Boolean = true
 ) {
@@ -200,7 +206,7 @@ fun StatusCard(
                         Spacer(Modifier.height(6.dp))
                     }
 
-                    StatusBody(displayed, onOpenUrl)
+                    StatusBody(displayed)
                 }
 
                 StatusActions(
@@ -209,6 +215,7 @@ fun StatusCard(
                     onReply = { onReply(displayed) },
                     onFavourite = { onFavourite(status) },
                     onReblog = { onReblog(status) },
+                    onBookmark = { onBookmark(status) },
                     interactive = interactive
                 )
             }
@@ -222,7 +229,7 @@ fun StatusCard(
 }
 
 @Composable
-private fun StatusBody(status: Status, onOpenUrl: (String) -> Unit) {
+private fun StatusBody(status: Status) {
     val body = HtmlText.plain(
         status.content,
         status.emojis.filter { it.url.isNotBlank() }.map { it.shortcode }.toSet()
@@ -236,7 +243,7 @@ private fun StatusBody(status: Status, onOpenUrl: (String) -> Unit) {
             modifier = Modifier.fillMaxWidth()
         )
     }
-    MediaGrid(media = status.mediaAttachments, onOpenUrl = onOpenUrl)
+    MediaGrid(media = status.mediaAttachments)
     PollView(poll = status.poll)
 }
 
@@ -261,20 +268,32 @@ private fun rememberStatusText(body: String, emojis: List<Emoji>): EmojiTextData
                 } else {
                     null
                 }
-                if (emoji != null) {
-                    appendInlineContent("emoji:${emoji.shortcode}", token)
-                } else {
-                    val color = when {
-                        token.startsWith("#") -> semantics.tag
-                        token.startsWith("@") -> mentionColor
-                        token.startsWith(":") -> null
-                        else -> semantics.link
-                    }
-                    if (color != null) {
-                        withStyle(SpanStyle(color = color)) { append(token) }
-                    } else {
+                when {
+                    emoji != null -> appendInlineContent("emoji:${emoji.shortcode}", token)
+                    token.startsWith("http://") || token.startsWith("https://") -> {
+                        val start = length
                         append(token)
+                        addLink(
+                            LinkAnnotation.Url(
+                                url = token,
+                                styles = TextLinkStyles(
+                                    style = SpanStyle(
+                                        color = semantics.link,
+                                        textDecoration = TextDecoration.Underline
+                                    )
+                                )
+                            ),
+                            start = start,
+                            end = length
+                        )
                     }
+                    token.startsWith("#") -> {
+                        withStyle(SpanStyle(color = semantics.tag)) { append(token) }
+                    }
+                    token.startsWith("@") -> {
+                        withStyle(SpanStyle(color = mentionColor)) { append(token) }
+                    }
+                    else -> append(token)
                 }
                 cursor = match.range.last + 1
             }
@@ -291,6 +310,7 @@ private fun StatusActions(
     onReply: () -> Unit,
     onFavourite: () -> Unit,
     onReblog: () -> Unit,
+    onBookmark: () -> Unit,
     interactive: Boolean
 ) {
     val semantics = LocalOltnSemantics.current
@@ -327,6 +347,18 @@ private fun StatusActions(
                 active = status.favourited,
                 contentDescription = stringResource(R.string.action_favourite),
                 onClick = onFavourite
+            )
+            StatusAction(
+                icon = if (status.bookmarked) {
+                    Icons.Rounded.Bookmark
+                } else {
+                    Icons.Rounded.BookmarkBorder
+                },
+                count = 0,
+                tint = MaterialTheme.colorScheme.primary,
+                active = status.bookmarked,
+                contentDescription = stringResource(R.string.action_bookmark),
+                onClick = onBookmark
             )
         }
         Spacer(Modifier.weight(1f))

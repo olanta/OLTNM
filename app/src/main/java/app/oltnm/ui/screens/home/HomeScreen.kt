@@ -303,6 +303,7 @@ private fun TimelineView(
                         onOpenUrl = openUrl,
                         onFavourite = viewModel::toggleFavourite,
                         onReblog = viewModel::toggleReblog,
+                        onBookmark = viewModel::toggleBookmark,
                         interactive = interactive
                     )
                 }

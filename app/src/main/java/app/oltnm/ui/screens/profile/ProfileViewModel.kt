@@ -136,6 +136,22 @@ class ProfileViewModel(
         }
     }
 
+    fun toggleBookmark(status: Status) {
+        val target = status.original
+        val next = !target.bookmarked
+        updateStatus(target.id) { it.copy(bookmarked = next) }
+        viewModelScope.launch {
+            runCatching {
+                if (next) api.bookmark(target.id) else api.unbookmark(target.id)
+            }
+                .onSuccess { server -> updateStatus(server.id) { server } }
+                .onFailure { error ->
+                    updateStatus(target.id) { it.copy(bookmarked = !next) }
+                    _state.update { it.copy(error = error.userMessage()) }
+                }
+        }
+    }
+
     fun clearError() {
         _state.update { it.copy(error = null) }
     }

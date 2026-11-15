@@ -138,7 +138,8 @@ fun ProfileScreen(
                                 onReply = onReply,
                                 onOpenUrl = openUrl,
                                 onFavourite = viewModel::toggleFavourite,
-                                onReblog = viewModel::toggleReblog
+                                onReblog = viewModel::toggleReblog,
+                                onBookmark = viewModel::toggleBookmark
                             )
                         }
                     }

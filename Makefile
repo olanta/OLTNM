@@ -155,7 +155,8 @@ endif
 
 wait-device:
 	"$(ADB)" wait-for-device
-	$(SLEEP)
+	"$(ADB)" shell 'until [ "$$(getprop sys.boot_completed)" = "1" ]; do sleep 1; done'
+	"$(ADB)" shell input keyevent 82
 
 build: check-sdk
 	$(GRADLEW) :app:assembleDebug

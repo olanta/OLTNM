@@ -132,6 +132,7 @@ fun TrendingScreen(
                                 onOpenUrl = openUrl,
                                 onFavourite = {},
                                 onReblog = {},
+                                onBookmark = {},
                                 interactive = false
                             )
                         }

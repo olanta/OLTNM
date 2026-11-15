@@ -8,6 +8,7 @@ import app.oltnm.data.model.InstanceInfo
 import app.oltnm.data.model.InstanceLimits
 import app.oltnm.data.model.MastodonList
 import app.oltnm.data.model.Notification
+import app.oltnm.data.model.ReportRequest
 import app.oltnm.data.model.ScheduledStatus
 import app.oltnm.data.model.SearchResults
 import app.oltnm.data.model.Status
@@ -42,6 +43,22 @@ class MastodonApi(
     suspend fun verifyCredentials(): Account = getJson<Account>("/api/v1/accounts/verify_credentials")
 
     suspend fun account(accountId: String): Account = getJson<Account>("/api/v1/accounts/$accountId")
+
+    suspend fun blockAccount(accountId: String) {
+        postRaw("/api/v1/accounts/$accountId/block", "{}")
+    }
+
+    suspend fun reportAccount(accountId: String, statusId: String?, comment: String) {
+        val payload = ReportRequest(
+            accountId = accountId,
+            statusIds = listOfNotNull(statusId),
+            comment = comment.trim()
+        )
+        postRaw(
+            "/api/v1/reports",
+            JsonConfig.json.encodeToString(ReportRequest.serializer(), payload)
+        )
+    }
 
     suspend fun instanceDetails(): InstanceDetails {
         val v2 = runCatching { getJson<InstanceLimits>("/api/v2/instance") }.getOrNull()
@@ -209,8 +226,18 @@ class MastodonApi(
 
     suspend fun unreblog(statusId: String): Status = postJson<Status>("/api/v1/statuses/$statusId/unreblog")
 
+    suspend fun bookmark(statusId: String): Status = postJson<Status>("/api/v1/statuses/$statusId/bookmark")
+
+    suspend fun unbookmark(statusId: String): Status = postJson<Status>("/api/v1/statuses/$statusId/unbookmark")
+
     suspend fun postStatus(request: StatusRequest): Status = postRaw("/api/v1/statuses", json.encodeStatusRequest(request))
         .let { json.decode<Status>(it.body) }
+
+    suspend fun updateStatus(statusId: String, payload: StatusRequest): Status {
+        val body = json.encodeStatusRequest(payload).toRequestBody(JSON_MEDIA)
+        return execute(request(url("/api/v1/statuses/$statusId", emptyMap()), "PUT", body))
+            .let { json.decode<Status>(it.body) }
+    }
 
     suspend fun scheduleStatus(request: StatusRequest): ScheduledStatus = postRaw("/api/v1/statuses", json.encodeStatusRequest(request))
         .let { json.decode<ScheduledStatus>(it.body) }

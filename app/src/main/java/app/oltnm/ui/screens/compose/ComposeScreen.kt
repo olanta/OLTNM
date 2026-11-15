@@ -2,6 +2,7 @@ package app.oltnm.ui.screens.compose
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Audiotrack
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.GifBox
 import androidx.compose.material.icons.rounded.Image
@@ -75,6 +77,7 @@ import app.oltnm.data.api.MastodonApi
 import app.oltnm.data.api.TranslateApi
 import app.oltnm.data.api.languageDisplayName
 import app.oltnm.data.model.QuotePolicy
+import app.oltnm.data.model.Status
 import app.oltnm.data.model.Visibility
 import app.oltnm.data.store.DraftStore
 import app.oltnm.data.store.PreferencesStore
@@ -109,17 +112,19 @@ fun ComposeScreen(
     draftStore: DraftStore,
     preferences: PreferencesStore,
     onPosted: () -> Unit,
+    sessionKey: Int = 0,
     replyTo: ReplyTarget? = null,
+    editStatus: Status? = null,
     onBack: (() -> Unit)? = null
 ) {
     val viewModel: ComposeViewModel = viewModel(
-        key = if (replyTo == null) {
-            "compose-${api.hashCode()}"
-        } else {
-            "compose-reply-${replyTo.statusId}"
+        key = when {
+            editStatus != null -> "compose-edit-${editStatus.id}"
+            replyTo != null -> "compose-reply-${replyTo.statusId}"
+            else -> "compose-${api.hashCode()}-$sessionKey"
         },
         factory = factoryOf {
-            ComposeViewModel(api, giphyApi, translateApi, draftStore, replyTo)
+            ComposeViewModel(api, giphyApi, translateApi, draftStore, replyTo, editStatus)
         }
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -137,25 +142,28 @@ fun ComposeScreen(
     var gifOpen by remember { mutableStateOf(false) }
     var translateOpen by remember { mutableStateOf(false) }
 
-    val mediaLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris ->
-        if (uris.isEmpty()) return@rememberLauncherForActivityResult
-        scope.launch {
-            val files = withContext(Dispatchers.IO) {
-                uris.mapNotNull { uri ->
-                    val bytes = runCatching {
-                        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                    }.getOrNull() ?: return@mapNotNull null
-                    val mimeType = context.contentResolver.getType(uri)
-                        ?: "application/octet-stream"
-                    val name = queryDisplayName(context, uri) ?: "upload"
-                    MediaFile(name, bytes, mimeType)
+    val attachUris: (List<Uri>) -> Unit = { uris ->
+        if (uris.isNotEmpty()) {
+            scope.launch {
+                val files = withContext(Dispatchers.IO) {
+                    uris.mapNotNull { uri ->
+                        val bytes = runCatching {
+                            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        }.getOrNull() ?: return@mapNotNull null
+                        val mimeType = context.contentResolver.getType(uri)
+                            ?: "application/octet-stream"
+                        val name = queryDisplayName(context, uri) ?: "upload"
+                        MediaFile(name, bytes, mimeType)
+                    }
                 }
+                viewModel.attachMedia(files)
             }
-            viewModel.attachMedia(files)
         }
     }
+
+    val mediaLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris -> attachUris(uris) }
 
     val openSchedulePicker: () -> Unit = {
         val now = Calendar.getInstance()
@@ -195,7 +203,11 @@ fun ComposeScreen(
         if (state.posted) {
             Toast.makeText(
                 context,
-                if (state.scheduled) R.string.scheduled else R.string.posted,
+                when {
+                    editStatus != null -> R.string.updated
+                    state.scheduled -> R.string.scheduled
+                    else -> R.string.posted
+                },
                 Toast.LENGTH_SHORT
             ).show()
             viewModel.consumePosted()
@@ -211,27 +223,67 @@ fun ComposeScreen(
         viewModel.onTextChange(newText)
     }
 
-    val errorText = composeErrorText(state.error, state.maxChars)
-    val threadParts = remember(state.text, state.maxChars) {
-        val trimmed = state.text.trim()
-        if (trimmed.length > state.maxChars) {
-            ThreadText.split(trimmed, state.maxChars).size
+    val pasteClipboard: () -> Unit = {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val clip = clipboard?.primaryClip
+        val item = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)
+        val mime = clip?.description?.getMimeType(0).orEmpty()
+        val uri = item?.uri
+        val uriMime = uri?.let { context.contentResolver.getType(it) }.orEmpty()
+        val mediaMime = if (
+            mime.startsWith("image/") ||
+            mime.startsWith("video/") ||
+            mime.startsWith("audio/")
+        ) {
+            mime
         } else {
-            1
+            uriMime
+        }
+        val isMedia = mediaMime.startsWith("image/") ||
+            mediaMime.startsWith("video/") ||
+            mediaMime.startsWith("audio/")
+        if (uri != null && isMedia) {
+            attachUris(listOf(uri))
+        } else {
+            val text = item?.coerceToText(context)?.toString().orEmpty()
+            if (text.isNotBlank()) {
+                insert(text)
+            } else {
+                Toast.makeText(context, R.string.paste_empty, Toast.LENGTH_SHORT).show()
+            }
         }
     }
-    val overLimit = threadParts > 1
+
+    val errorText = composeErrorText(state.error, state.maxChars)
+    val threadParts = remember(state.text, state.maxChars, editStatus) {
+        if (editStatus != null) {
+            1
+        } else {
+            val trimmed = state.text.trim()
+            if (trimmed.length > state.maxChars) {
+                ThreadText.split(trimmed, state.maxChars).size
+            } else {
+                1
+            }
+        }
+    }
+    val overLimit = if (editStatus != null) {
+        state.text.length > state.maxChars
+    } else {
+        threadParts > 1
+    }
     val codeBlocks = remember(state.text, state.poll) {
         if (state.poll == null) CodeImage.extractCodeBlocks(state.text) else emptyList()
     }
     val canPost = (state.text.isNotBlank() || state.media.isNotEmpty() || state.poll != null) &&
         !state.posting &&
         !state.uploading &&
-        (state.scheduledAtMillis == null || threadParts == 1)
-    val postLabel = if (state.scheduledAtMillis != null) {
-        stringResource(R.string.schedule)
-    } else {
-        stringResource(R.string.compose_post)
+        (state.scheduledAtMillis == null || threadParts == 1) &&
+        (editStatus == null || !overLimit)
+    val postLabel = when {
+        editStatus != null -> stringResource(R.string.save)
+        state.scheduledAtMillis != null -> stringResource(R.string.schedule)
+        else -> stringResource(R.string.compose_post)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -239,10 +291,10 @@ fun ComposeScreen(
             title = {
                 Text(
                     stringResource(
-                        if (replyTo == null) {
-                            R.string.compose_title
-                        } else {
-                            R.string.compose_reply_title
+                        when {
+                            editStatus != null -> R.string.compose_edit_title
+                            replyTo != null -> R.string.compose_reply_title
+                            else -> R.string.compose_title
                         }
                     )
                 )
@@ -326,7 +378,7 @@ fun ComposeScreen(
                     horizontalArrangement = Arrangement.End
                 ) {
                     Text(
-                        text = if (overLimit) {
+                        text = if (overLimit && editStatus == null) {
                             "$threadParts ${stringResource(R.string.thread_count)}"
                         } else {
                             "${state.text.length}/${state.maxChars}"
@@ -340,7 +392,7 @@ fun ComposeScreen(
                         textAlign = TextAlign.End
                     )
                 }
-                if (overLimit) {
+                if (overLimit && editStatus == null) {
                     Text(
                         text = stringResource(R.string.thread_auto_hint),
                         style = MaterialTheme.typography.labelSmall,
@@ -533,6 +585,12 @@ fun ComposeScreen(
                         }
                     )
                     ComposeToolButton(
+                        icon = Icons.Rounded.ContentPaste,
+                        label = stringResource(R.string.paste),
+                        enabled = !state.uploading,
+                        onClick = pasteClipboard
+                    )
+                    ComposeToolButton(
                         icon = Icons.Rounded.Image,
                         label = stringResource(R.string.text_as_image),
                         enabled = state.text.isNotBlank() &&
@@ -575,7 +633,7 @@ fun ComposeScreen(
                         icon = Icons.Rounded.Poll,
                         label = stringResource(R.string.add_poll),
                         active = state.poll != null,
-                        enabled = state.media.isEmpty() && !state.uploading,
+                        enabled = editStatus == null && state.media.isEmpty() && !state.uploading,
                         onClick = viewModel::togglePoll
                     )
                     ComposeToolButton(
@@ -606,7 +664,7 @@ fun ComposeScreen(
                         icon = Icons.Rounded.Schedule,
                         label = stringResource(R.string.schedule),
                         active = state.scheduledAtMillis != null,
-                        enabled = threadParts == 1,
+                        enabled = editStatus == null && threadParts == 1,
                         onClick = openSchedulePicker
                     )
                     Spacer(Modifier.weight(1f))
