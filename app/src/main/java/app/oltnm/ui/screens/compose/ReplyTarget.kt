@@ -6,7 +6,8 @@ import app.oltnm.data.model.Visibility
 data class ReplyTarget(
     val statusId: String,
     val acct: String,
-    val visibility: Visibility
+    val visibility: Visibility,
+    val lookupUrl: String? = null
 ) {
     val initialText: String
         get() {
@@ -15,12 +16,13 @@ data class ReplyTarget(
         }
 
     companion object {
-        fun from(status: Status): ReplyTarget {
+        fun from(status: Status, resolve: Boolean = false): ReplyTarget {
             val original = status.original
             return ReplyTarget(
                 statusId = original.id,
                 acct = original.account.acct,
-                visibility = Visibility.fromApi(original.visibility)
+                visibility = Visibility.fromApi(original.visibility),
+                lookupUrl = if (resolve) original.displayUrl else null
             )
         }
     }

@@ -75,6 +75,7 @@ fun TimelineScreen(
     onOpenAccount: (String) -> Unit,
     onOpenStatus: (String, String?) -> Unit,
     onReply: (Status) -> Unit,
+    onReplyRemote: (Status) -> Unit,
     onManageTimelines: () -> Unit
 ) {
     val timelines by container.timelineStore.timelines.collectAsStateWithLifecycle()
@@ -159,11 +160,11 @@ fun TimelineScreen(
                     spec = selected,
                     ownApi = api,
                     remoteApi = remoteApi,
-                    interactive = !remote,
+                    interactive = true,
                     refreshSignal = refreshSignal,
                     onOpenAccount = onOpenAccount,
                     onOpenStatus = { id -> onOpenStatus(id, remoteHost) },
-                    onReply = onReply
+                    onReply = if (remote) onReplyRemote else onReply
                 )
             }
         }
@@ -259,7 +260,7 @@ private fun TimelineView(
         if (shouldLoadMore) viewModel.loadMore()
     }
 
-    val accountCallback: (String) -> Unit = if (interactive) {
+    val accountCallback: (String) -> Unit = if (remoteApi == null) {
         onOpenAccount
     } else {
         { accountId ->

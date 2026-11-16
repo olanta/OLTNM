@@ -375,6 +375,18 @@ class ComposeViewModel(
 
         viewModelScope.launch {
             _state.update { it.copy(posting = true, error = null) }
+            val resolvedReplyId = if (replyTo?.lookupUrl != null) {
+                val resolved = resolveRemoteReply()
+                if (resolved == null) {
+                    _state.update {
+                        it.copy(posting = false, error = ComposeError.Generic)
+                    }
+                    return@launch
+                }
+                resolved
+            } else {
+                replyTo?.statusId
+            }
 
             val syncedMedia = snapshot.media.map { item ->
                 runCatching {
@@ -430,7 +442,7 @@ class ComposeViewModel(
                     status = parts.first(),
                     visibility = visibility.apiValue,
                     spoilerText = if (snapshot.spoilerEnabled) snapshot.spoiler.trim() else "",
-                    inReplyToId = replyTo?.statusId,
+                    inReplyToId = resolvedReplyId,
                     sensitive = snapshot.sensitive,
                     mediaIds = mediaIds,
                     poll = poll,
@@ -453,7 +465,7 @@ class ComposeViewModel(
                 return@launch
             }
 
-            var replyToId: String? = replyTo?.statusId
+            var replyToId: String? = resolvedReplyId
             var postedCount = 0
             var failed = false
             for ((index, part) in parts.withIndex()) {
@@ -662,6 +674,11 @@ class ComposeViewModel(
                     _state.update { it.copy(loadingCustomEmojis = false) }
                 }
         }
+    }
+
+    private suspend fun resolveRemoteReply(): String? {
+        val url = replyTo?.lookupUrl ?: return replyTo?.statusId
+        return runCatching { api.search(url).statuses.firstOrNull()?.id }.getOrNull()
     }
 
     fun consumePosted() {

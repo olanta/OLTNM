@@ -92,7 +92,10 @@ class TimelineViewModel(
     }
 
     fun toggleFavourite(status: Status) {
-        if (isRemote) return
+        if (isRemote) {
+            toggleRemoteFavourite(status)
+            return
+        }
         val target = status.original
         val next = !target.favourited
         updateStatus(target.id) {
@@ -118,7 +121,10 @@ class TimelineViewModel(
     }
 
     fun toggleReblog(status: Status) {
-        if (isRemote) return
+        if (isRemote) {
+            toggleRemoteReblog(status)
+            return
+        }
         val target = status.original
         val next = !target.reblogged
         updateStatus(target.id) {
@@ -144,7 +150,10 @@ class TimelineViewModel(
     }
 
     fun toggleBookmark(status: Status) {
-        if (isRemote) return
+        if (isRemote) {
+            toggleRemoteBookmark(status)
+            return
+        }
         val target = status.original
         val next = !target.bookmarked
         updateStatus(target.id) { it.copy(bookmarked = next) }
@@ -155,6 +164,105 @@ class TimelineViewModel(
                 .onSuccess { server -> updateStatus(server.id) { server } }
                 .onFailure { error ->
                     updateStatus(target.id) { it.copy(bookmarked = !next) }
+                    _state.update { it.copy(error = error.userMessage()) }
+                }
+        }
+    }
+
+    private suspend fun resolveLocal(status: Status): Status? {
+        val url = status.displayUrl ?: return null
+        return runCatching { ownApi.search(url).statuses.firstOrNull() }.getOrNull()
+    }
+
+    private fun toggleRemoteFavourite(status: Status) {
+        val target = status.original
+        viewModelScope.launch {
+            val local = resolveLocal(target)
+            if (local == null) {
+                _state.update { it.copy(error = REMOTE_RESOLVE_ERROR) }
+                return@launch
+            }
+            val next = !local.favourited
+            updateStatus(target.id) {
+                it.copy(
+                    favourited = next,
+                    favouritesCount = (local.favouritesCount + if (next) 1 else -1)
+                        .coerceAtLeast(0)
+                )
+            }
+            runCatching { if (next) ownApi.favourite(local.id) else ownApi.unfavourite(local.id) }
+                .onSuccess { server ->
+                    updateStatus(target.id) {
+                        it.copy(
+                            favourited = server.favourited,
+                            favouritesCount = server.favouritesCount
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    updateStatus(target.id) {
+                        it.copy(
+                            favourited = local.favourited,
+                            favouritesCount = local.favouritesCount
+                        )
+                    }
+                    _state.update { it.copy(error = error.userMessage()) }
+                }
+        }
+    }
+
+    private fun toggleRemoteReblog(status: Status) {
+        val target = status.original
+        viewModelScope.launch {
+            val local = resolveLocal(target)
+            if (local == null) {
+                _state.update { it.copy(error = REMOTE_RESOLVE_ERROR) }
+                return@launch
+            }
+            val next = !local.reblogged
+            updateStatus(target.id) {
+                it.copy(
+                    reblogged = next,
+                    reblogsCount = (local.reblogsCount + if (next) 1 else -1).coerceAtLeast(0)
+                )
+            }
+            runCatching { if (next) ownApi.reblog(local.id) else ownApi.unreblog(local.id) }
+                .onSuccess { server ->
+                    updateStatus(target.id) {
+                        it.copy(
+                            reblogged = server.reblogged,
+                            reblogsCount = server.reblogsCount
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    updateStatus(target.id) {
+                        it.copy(
+                            reblogged = local.reblogged,
+                            reblogsCount = local.reblogsCount
+                        )
+                    }
+                    _state.update { it.copy(error = error.userMessage()) }
+                }
+        }
+    }
+
+    private fun toggleRemoteBookmark(status: Status) {
+        val target = status.original
+        viewModelScope.launch {
+            val local = resolveLocal(target)
+            if (local == null) {
+                _state.update { it.copy(error = REMOTE_RESOLVE_ERROR) }
+                return@launch
+            }
+            val next = !local.bookmarked
+            updateStatus(target.id) { it.copy(bookmarked = next) }
+            runCatching { if (next) ownApi.bookmark(local.id) else ownApi.unbookmark(local.id) }
+                .onSuccess { server ->
+                    updateStatus(target.id) { it.copy(bookmarked = server.bookmarked) }
+                }
+                .onFailure { error ->
+                    updateStatus(target.id) { it.copy(bookmarked = local.bookmarked) }
                     _state.update { it.copy(error = error.userMessage()) }
                 }
         }
@@ -205,5 +313,9 @@ class TimelineViewModel(
                 }
             )
         }
+    }
+
+    private companion object {
+        const val REMOTE_RESOLVE_ERROR = "Could not find this post on your instance."
     }
 }

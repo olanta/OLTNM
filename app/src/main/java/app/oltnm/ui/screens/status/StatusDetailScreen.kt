@@ -1,6 +1,8 @@
 package app.oltnm.ui.screens.status
 
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Block
@@ -20,6 +23,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -30,6 +34,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -201,6 +208,9 @@ fun StatusDetailScreen(
                     if (status == null) {
                         LoadingView()
                     } else {
+                        val threadById = (
+                            listOfNotNull(status) + state.ancestors + state.descendants
+                            ).associateBy { it.id }
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
                             state.error?.let { message ->
                                 item(key = "error") {
@@ -219,17 +229,19 @@ fun StatusDetailScreen(
                                 }
                             }
                             item(key = "status") {
-                                StatusCard(
-                                    status = status,
-                                    onOpenAccount = accountCallback,
-                                    onOpenStatus = {},
-                                    onReply = onReply,
-                                    onOpenUrl = openUrl,
-                                    onFavourite = viewModel::toggleFavourite,
-                                    onReblog = viewModel::toggleReblog,
-                                    onBookmark = viewModel::toggleBookmark,
-                                    interactive = interactive
-                                )
+                                FocusedStatusCard {
+                                    StatusCard(
+                                        status = status,
+                                        onOpenAccount = accountCallback,
+                                        onOpenStatus = {},
+                                        onReply = onReply,
+                                        onOpenUrl = openUrl,
+                                        onFavourite = viewModel::toggleFavourite,
+                                        onReblog = viewModel::toggleReblog,
+                                        onBookmark = viewModel::toggleBookmark,
+                                        interactive = interactive
+                                    )
+                                }
                             }
                             if (state.ancestors.isNotEmpty()) {
                                 item(key = "ancestors-title") {
@@ -260,17 +272,21 @@ fun StatusDetailScreen(
                                     )
                                 }
                                 items(state.descendants, key = { "descendant-${it.id}" }) { descendant ->
-                                    StatusCard(
-                                        status = descendant,
-                                        onOpenAccount = accountCallback,
-                                        onOpenStatus = { onOpenStatus(it.original.id) },
-                                        onReply = onReply,
-                                        onOpenUrl = openUrl,
-                                        onFavourite = viewModel::toggleFavourite,
-                                        onReblog = viewModel::toggleReblog,
-                                        onBookmark = viewModel::toggleBookmark,
-                                        interactive = interactive
-                                    )
+                                    ThreadReplyCard(
+                                        depth = replyDepth(descendant, threadById)
+                                    ) {
+                                        StatusCard(
+                                            status = descendant,
+                                            onOpenAccount = accountCallback,
+                                            onOpenStatus = { onOpenStatus(it.original.id) },
+                                            onReply = onReply,
+                                            onOpenUrl = openUrl,
+                                            onFavourite = viewModel::toggleFavourite,
+                                            onReblog = viewModel::toggleReblog,
+                                            onBookmark = viewModel::toggleBookmark,
+                                            interactive = interactive
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -358,5 +374,53 @@ fun StatusDetailScreen(
                 }
             }
         )
+    }
+}
+
+private fun replyDepth(status: Status, byId: Map<String, Status>): Int {
+    var depth = 0
+    var current: Status? = status
+    while (depth < 6) {
+        val parentId = current?.inReplyToId ?: break
+        current = byId[parentId] ?: break
+        depth += 1
+    }
+    return depth
+}
+
+@Composable
+private fun FocusedStatusCard(content: @Composable () -> Unit) {
+    val shape = RoundedCornerShape(18.dp)
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(2.dp, MaterialTheme.colorScheme.primary, shape)
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun ThreadReplyCard(
+    depth: Int,
+    content: @Composable () -> Unit
+) {
+    val accent = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = (12 + depth.coerceIn(0, 6) * 12).dp)
+            .drawBehind {
+                drawLine(
+                    color = accent,
+                    start = Offset(0f, 0f),
+                    end = Offset(0f, size.height),
+                    strokeWidth = 2.dp.toPx()
+                )
+            }
+    ) {
+        content()
     }
 }

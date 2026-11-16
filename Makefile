@@ -8,7 +8,7 @@ STUDIO_JBR ?= C:/Program Files/Android/Android Studio/jbr
 SDK_CANDIDATE := $(subst \,/,$(LOCALAPPDATA))/Android/Sdk
 SDK_FALLBACK := $(subst \,/,$(USERPROFILE))/AppData/Local/Android/Sdk
 SLEEP := cmd /c "timeout /t 5 /nobreak >NUL"
-START_EMULATOR = cmd /c start "OLTNM emulator" "$(EMULATOR)" -avd $(AVD)
+START_EMULATOR = cmd /c start "OLTNM emulator" "$(EMULATOR)" -avd $(AVD) -no-snapshot
 ANDROID_CLI = $(ANDROID_HOME)/cmdline-tools/latest/bin/android.exe
 ANDROID_CLI_CMD = $(ANDROID_CLI)
 SDKMANAGER_CMD = $(SDKMANAGER)
@@ -22,7 +22,7 @@ STUDIO_JBR ?=
 SDK_CANDIDATE := $(HOME)/Android/Sdk
 SDK_FALLBACK :=
 SLEEP := sleep 5
-START_EMULATOR = $(EMULATOR) -avd $(AVD) &
+START_EMULATOR = $(EMULATOR) -avd $(AVD) -no-snapshot &
 ANDROID_CLI = $(ANDROID_HOME)/cmdline-tools/latest/bin/android
 ANDROID_CLI_CMD = "$(ANDROID_CLI)"
 SDKMANAGER_CMD = "$(SDKMANAGER)"
@@ -84,7 +84,7 @@ help:
 	@echo   make sdk            install the SDK 36 platform and build-tools
 	@echo   make emulator-sdk   install the emulator and system image
 	@echo   make avd            create the $(NEW_AVD) virtual device
-	@echo   make emulator       start the $(AVD) emulator
+	@echo   make emulator       start $(AVD) with a cold boot (no snapshot)
 	@echo   make run-emu        start emulator, install and launch the app
 	@echo   make avds           list Android Virtual Devices
 	@echo   make build          build the debug APK in app/build/outputs/apk/debug

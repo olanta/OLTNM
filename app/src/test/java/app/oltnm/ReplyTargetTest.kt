@@ -45,4 +45,15 @@ class ReplyTargetTest {
             ReplyTarget.from(Status(id = "1", visibility = "unknown")).visibility
         )
     }
+
+    @Test
+    fun keepsLookupUrlForRemoteReplies() {
+        val status = Status(id = "1", url = "https://example.social/statuses/1")
+
+        assertEquals(null, ReplyTarget.from(status).lookupUrl)
+        assertEquals(
+            "https://example.social/statuses/1",
+            ReplyTarget.from(status, resolve = true).lookupUrl
+        )
+    }
 }

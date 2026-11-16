@@ -174,6 +174,9 @@ private fun MainScaffold(
     val openReply: (Status) -> Unit = { status ->
         stack.add(Route.ComposeReply(ReplyTarget.from(status)))
     }
+    val openRemoteReply: (Status) -> Unit = { status ->
+        stack.add(Route.ComposeReply(ReplyTarget.from(status, resolve = true)))
+    }
     val back: () -> Unit = {
         if (stack.size > 1) stack.removeAt(stack.lastIndex)
     }
@@ -291,6 +294,7 @@ private fun MainScaffold(
                     onOpenAccount = openAccount,
                     onOpenStatus = openStatus,
                     onReply = openReply,
+                    onReplyRemote = openRemoteReply,
                     onManageTimelines = { navigate(Route.ManageTimelines) }
                 )
                 Route.Search -> SearchScreen(
