@@ -9,6 +9,7 @@ SDK_CANDIDATE := $(subst \,/,$(LOCALAPPDATA))/Android/Sdk
 SDK_FALLBACK := $(subst \,/,$(USERPROFILE))/AppData/Local/Android/Sdk
 SLEEP := cmd /c "timeout /t 5 /nobreak >NUL"
 START_EMULATOR = cmd /c start "OLTNM emulator" "$(EMULATOR)" -avd $(AVD) -no-snapshot
+DEVICE_CHECK = "$(ADB)" devices | findstr /R "emulator-.*device" >NUL
 ANDROID_CLI = $(ANDROID_HOME)/cmdline-tools/latest/bin/android.exe
 ANDROID_CLI_CMD = $(ANDROID_CLI)
 SDKMANAGER_CMD = $(SDKMANAGER)
@@ -23,6 +24,7 @@ SDK_CANDIDATE := $(HOME)/Android/Sdk
 SDK_FALLBACK :=
 SLEEP := sleep 5
 START_EMULATOR = $(EMULATOR) -avd $(AVD) -no-snapshot &
+DEVICE_CHECK = "$(ADB)" devices | grep -q "emulator-.*device"
 ANDROID_CLI = $(ANDROID_HOME)/cmdline-tools/latest/bin/android
 ANDROID_CLI_CMD = "$(ANDROID_CLI)"
 SDKMANAGER_CMD = "$(SDKMANAGER)"
@@ -77,15 +79,16 @@ SYSTEM_IMAGE ?= system-images;android-36;google_apis;x86_64
 DEBUG_ACTIVITY := app.oltnm.debug/app.oltnm.MainActivity
 
 .DEFAULT_GOAL := help
-.PHONY: help sdk emulator-sdk licenses avd avds emulator wait-device build build-release install run run-emu devices test validate ci lint format format-check emojis clean doctor check-sdk
+.PHONY: help sdk emulator-sdk licenses avd avds start-emulator emulator emulate run-emu wait-device build build-release install run devices test validate ci lint format format-check emojis clean doctor check-sdk
 
 help:
 	@echo Targets:
 	@echo   make sdk            install the SDK 36 platform and build-tools
 	@echo   make emulator-sdk   install the emulator and system image
 	@echo   make avd            create the $(NEW_AVD) virtual device
-	@echo   make emulator       start $(AVD) with a cold boot (no snapshot)
-	@echo   make run-emu        start emulator, install and launch the app
+	@echo   make emulator       cold boot, install the latest build and launch
+	@echo   make emulate        alias for "make emulator"
+	@echo   make run-emu        alias for "make emulator"
 	@echo   make avds           list Android Virtual Devices
 	@echo   make build          build the debug APK in app/build/outputs/apk/debug
 	@echo   make build-release  build the minified release APK
@@ -144,14 +147,20 @@ endif
 avds:
 	$(AVDMANAGER_CMD) list avd
 
-emulator:
+start-emulator:
 ifeq ($(wildcard $(EMULATOR)),)
 	@echo Emulator not found. Run "make sdk" first.
 	@exit 1
 else
-	@echo Starting $(AVD)...
-	$(START_EMULATOR)
+	@$(DEVICE_CHECK) || (echo Starting $(AVD)... && $(START_EMULATOR))
 endif
+
+emulator: check-sdk start-emulator wait-device install
+	"$(ADB)" shell am start -n $(DEBUG_ACTIVITY)
+
+emulate: emulator
+
+run-emu: emulator
 
 wait-device:
 	"$(ADB)" wait-for-device
@@ -165,12 +174,10 @@ build-release: check-sdk
 	$(GRADLEW) :app:assembleRelease
 
 install: check-sdk
+	"$(ADB)" wait-for-device
 	$(GRADLEW) :app:installDebug
 
 run: install
-	"$(ADB)" shell am start -n $(DEBUG_ACTIVITY)
-
-run-emu: emulator wait-device install
 	"$(ADB)" shell am start -n $(DEBUG_ACTIVITY)
 
 devices:
