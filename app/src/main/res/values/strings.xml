@@ -52,6 +52,14 @@
     <string name="profile_statuses">Posts</string>
     <string name="profile_followers">Followers</string>
     <string name="profile_following">Following</string>
+    <string name="follow">Follow</string>
+    <string name="follow_back">Follow back</string>
+    <string name="unfollow">Unfollow</string>
+    <string name="cancel_follow_request">Cancel request</string>
+    <string name="follow_mutual">Mutual</string>
+    <string name="follow_following">Following</string>
+    <string name="follow_follows_you">Follows you</string>
+    <string name="follow_requested">Requested</string>
     <string name="bot_account">Bot account</string>
     <string name="back">Back</string>
 

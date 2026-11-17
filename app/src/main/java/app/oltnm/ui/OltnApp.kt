@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -14,6 +15,8 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -22,6 +25,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -35,9 +39,13 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import app.oltnm.R
 import app.oltnm.data.model.Session
 import app.oltnm.data.model.Status
@@ -62,6 +70,8 @@ import app.oltnm.ui.screens.timelines.ManageTimelinesScreen
 import app.oltnm.ui.screens.trending.TrendingScreen
 import app.oltnm.ui.theme.OltnTheme
 import app.oltnm.util.OAuthBus
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 sealed interface Route {
     data object Home : Route
@@ -157,6 +167,40 @@ private fun MainScaffold(
     val route = stack.last()
     var moreOpen by remember { mutableStateOf(false) }
     var composeNonce by rememberSaveable { mutableStateOf(0) }
+    var latestNotificationId by remember(session.key) { mutableStateOf<String?>(null) }
+    var hasNewNotifications by remember(session.key) { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val density = LocalDensity.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
+
+    LaunchedEffect(api, session.key) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (isActive) {
+                val latest = runCatching {
+                    api.notifications(limit = 1).items.firstOrNull()
+                }.getOrNull()
+                if (latest != null) {
+                    latestNotificationId = latest.id
+                    hasNewNotifications =
+                        latest.id != container.notificationSeenStore.lastSeen(session.key)
+                }
+                delay(30_000)
+            }
+        }
+    }
+
+    LaunchedEffect(route, latestNotificationId, session.key) {
+        if (route == Route.Notifications) {
+            val id = latestNotificationId ?: runCatching {
+                api.notifications(limit = 1).items.firstOrNull()?.id
+            }.getOrNull()
+            if (id != null) {
+                container.notificationSeenStore.markSeen(session.key, id)
+                latestNotificationId = id
+                hasNewNotifications = false
+            }
+        }
+    }
 
     val select: (Route) -> Unit = { next ->
         stack.clear()
@@ -193,91 +237,108 @@ private fun MainScaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-                tonalElevation = 0.dp,
-                modifier = Modifier.drawBehind {
-                    drawLine(
-                        color = navDividerColor,
-                        start = Offset.Zero,
-                        end = Offset(size.width, 0f),
-                        strokeWidth = 1f
-                    )
-                }
-            ) {
-                tabs.forEach { tab ->
-                    val isCompose = tab.route == Route.Compose
-                    NavigationBarItem(
-                        selected = route == tab.route,
-                        onClick = {
-                            if (tab.route == Route.Compose) composeNonce += 1
-                            select(tab.route)
-                        },
-                        icon = {
-                            if (isCompose) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary),
-                                    contentAlignment = Alignment.Center
-                                ) {
+            if (!imeVisible) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                    tonalElevation = 0.dp,
+                    modifier = Modifier.drawBehind {
+                        drawLine(
+                            color = navDividerColor,
+                            start = Offset.Zero,
+                            end = Offset(size.width, 0f),
+                            strokeWidth = 1f
+                        )
+                    }
+                ) {
+                    tabs.forEach { tab ->
+                        val isCompose = tab.route == Route.Compose
+                        NavigationBarItem(
+                            selected = route == tab.route,
+                            onClick = {
+                                if (tab.route == Route.Compose) composeNonce += 1
+                                select(tab.route)
+                            },
+                            icon = {
+                                if (isCompose) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = tab.icon,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                } else if (tab.route == Route.Notifications) {
+                                    BadgedBox(
+                                        badge = {
+                                            if (hasNewNotifications) {
+                                                Badge(
+                                                    containerColor = MaterialTheme.colorScheme.error
+                                                )
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = tab.icon,
+                                            contentDescription = null
+                                        )
+                                    }
+                                } else {
                                     Icon(
                                         imageVector = tab.icon,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(22.dp)
+                                        contentDescription = null
                                     )
                                 }
-                            } else {
-                                Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = null
+                            },
+                            label = {
+                                Text(
+                                    text = stringResource(tab.label),
+                                    style = MaterialTheme.typography.labelSmall
                                 )
-                            }
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = if (isCompose) {
+                                    Color.Transparent
+                                } else {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                },
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                    }
+                    NavigationBarItem(
+                        selected = moreOpen,
+                        onClick = { moreOpen = true },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Menu,
+                                contentDescription = null
+                            )
                         },
                         label = {
                             Text(
-                                text = stringResource(tab.label),
+                                text = stringResource(R.string.more),
                                 style = MaterialTheme.typography.labelSmall
                             )
                         },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.primary,
                             selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = if (isCompose) {
-                                Color.Transparent
-                            } else {
-                                MaterialTheme.colorScheme.primaryContainer
-                            },
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                             unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }
-                NavigationBarItem(
-                    selected = moreOpen,
-                    onClick = { moreOpen = true },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Rounded.Menu,
-                            contentDescription = null
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = stringResource(R.string.more),
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                )
             }
         }
     ) { padding ->
@@ -382,6 +443,7 @@ private fun MainScaffold(
                 is Route.Profile -> ProfileScreen(
                     api = api,
                     accountId = current.accountId,
+                    currentAccountId = session.accountId,
                     onBack = back,
                     onOpenAccount = openAccount,
                     onOpenStatus = { id -> openStatus(id, null) },

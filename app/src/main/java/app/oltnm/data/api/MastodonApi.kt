@@ -8,6 +8,7 @@ import app.oltnm.data.model.InstanceInfo
 import app.oltnm.data.model.InstanceLimits
 import app.oltnm.data.model.MastodonList
 import app.oltnm.data.model.Notification
+import app.oltnm.data.model.Relationship
 import app.oltnm.data.model.ReportRequest
 import app.oltnm.data.model.ScheduledStatus
 import app.oltnm.data.model.SearchResults
@@ -43,6 +44,19 @@ class MastodonApi(
     suspend fun verifyCredentials(): Account = getJson<Account>("/api/v1/accounts/verify_credentials")
 
     suspend fun account(accountId: String): Account = getJson<Account>("/api/v1/accounts/$accountId")
+
+    suspend fun relationship(accountId: String): Relationship? = relationships(listOf(accountId)).firstOrNull()
+
+    suspend fun relationships(accountIds: List<String>): List<Relationship> {
+        val builder = url("/api/v1/accounts/relationships", emptyMap()).newBuilder()
+        accountIds.forEach { builder.addQueryParameter("id[]", it) }
+        return execute(request(builder.build(), "GET"))
+            .let { json.decodeList<Relationship>(it.body) }
+    }
+
+    suspend fun follow(accountId: String): Relationship = postJson("/api/v1/accounts/$accountId/follow")
+
+    suspend fun unfollow(accountId: String): Relationship = postJson("/api/v1/accounts/$accountId/unfollow")
 
     suspend fun blockAccount(accountId: String) {
         postRaw("/api/v1/accounts/$accountId/block", "{}")

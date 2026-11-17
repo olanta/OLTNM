@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.oltnm.data.api.MastodonApi
 import app.oltnm.data.model.Account
+import app.oltnm.data.model.Relationship
 import app.oltnm.data.model.Status
 import app.oltnm.util.userMessage
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,10 +15,12 @@ import kotlinx.coroutines.launch
 
 data class ProfileUiState(
     val account: Account? = null,
+    val relationship: Relationship? = null,
     val items: List<Status> = emptyList(),
     val loading: Boolean = true,
     val refreshing: Boolean = false,
     val loadingMore: Boolean = false,
+    val followBusy: Boolean = false,
     val nextMaxId: String? = null,
     val error: String? = null
 )
@@ -46,12 +49,14 @@ class ProfileViewModel(
             runCatching {
                 val account = api.account(accountId)
                 val page = api.accountStatuses(accountId)
-                account to page
+                val relationship = runCatching { api.relationship(accountId) }.getOrNull()
+                Triple(account, page, relationship)
             }
-                .onSuccess { (account, page) ->
+                .onSuccess { (account, page, relationship) ->
                     _state.update {
                         it.copy(
                             account = account,
+                            relationship = relationship,
                             items = page.items,
                             nextMaxId = page.nextMaxId,
                             loading = false,
@@ -84,6 +89,33 @@ class ProfileViewModel(
                 }
                 .onFailure { error ->
                     _state.update { it.copy(loadingMore = false, error = error.userMessage()) }
+                }
+        }
+    }
+
+    fun toggleFollow() {
+        val current = _state.value.relationship ?: return
+        if (_state.value.followBusy) return
+        val shouldFollow = !current.following && !current.requested
+        val optimistic = current.copy(following = shouldFollow, requested = false)
+        _state.update { it.copy(relationship = optimistic, followBusy = true, error = null) }
+        viewModelScope.launch {
+            runCatching {
+                if (shouldFollow) api.follow(accountId) else api.unfollow(accountId)
+            }
+                .onSuccess { relationship ->
+                    _state.update {
+                        it.copy(relationship = relationship, followBusy = false)
+                    }
+                }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            relationship = current,
+                            followBusy = false,
+                            error = error.userMessage()
+                        )
+                    }
                 }
         }
     }

@@ -39,6 +39,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.oltnm.R
 import app.oltnm.data.api.MastodonApi
 import app.oltnm.data.model.Account
+import app.oltnm.data.model.Relationship
 import app.oltnm.data.model.Status
 import app.oltnm.ui.components.Avatar
 import app.oltnm.ui.components.ErrorBanner
@@ -46,6 +47,8 @@ import app.oltnm.ui.components.ErrorView
 import app.oltnm.ui.components.LoadMoreButton
 import app.oltnm.ui.components.LoadingRow
 import app.oltnm.ui.components.LoadingView
+import app.oltnm.ui.components.OltnGhostButton
+import app.oltnm.ui.components.OltnPrimaryButton
 import app.oltnm.ui.components.OltnTopBar
 import app.oltnm.ui.components.StatusCard
 import app.oltnm.ui.components.formatCount
@@ -60,6 +63,7 @@ import coil3.compose.AsyncImage
 fun ProfileScreen(
     api: MastodonApi,
     accountId: String,
+    currentAccountId: String,
     onBack: () -> Unit,
     onOpenAccount: (String) -> Unit,
     onOpenStatus: (String) -> Unit,
@@ -114,7 +118,15 @@ fun ProfileScreen(
                 )
                 else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                     state.account?.let { account ->
-                        item(key = "header") { ProfileHeader(account) }
+                        item(key = "header") {
+                            ProfileHeader(
+                                account = account,
+                                relationship = state.relationship,
+                                showFollow = account.id != currentAccountId,
+                                followBusy = state.followBusy,
+                                onFollow = viewModel::toggleFollow
+                            )
+                        }
                     }
                     if (state.items.isEmpty()) {
                         item(key = "empty") {
@@ -157,7 +169,13 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun ProfileHeader(account: Account) {
+private fun ProfileHeader(
+    account: Account,
+    relationship: Relationship?,
+    showFollow: Boolean,
+    followBusy: Boolean,
+    onFollow: () -> Unit
+) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
@@ -206,6 +224,14 @@ private fun ProfileHeader(account: Account) {
             }
         }
 
+        if (showFollow && relationship != null) {
+            ProfileFollowRow(
+                relationship = relationship,
+                followBusy = followBusy,
+                onFollow = onFollow
+            )
+        }
+
         val note = HtmlText.plain(
             account.note,
             account.emojis.filter { it.url.isNotBlank() }.map { it.shortcode }.toSet()
@@ -233,6 +259,53 @@ private fun ProfileHeader(account: Account) {
             thickness = 0.5.dp,
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
         )
+    }
+}
+
+@Composable
+private fun ProfileFollowRow(
+    relationship: Relationship,
+    followBusy: Boolean,
+    onFollow: () -> Unit
+) {
+    val status = when {
+        relationship.following && relationship.followedBy -> R.string.follow_mutual
+        relationship.following -> R.string.follow_following
+        relationship.followedBy -> R.string.follow_follows_you
+        relationship.requested -> R.string.follow_requested
+        else -> null
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (status != null) {
+            Text(
+                text = stringResource(status),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        val label = when {
+            relationship.following -> R.string.unfollow
+            relationship.requested -> R.string.cancel_follow_request
+            relationship.followedBy -> R.string.follow_back
+            else -> R.string.follow
+        }
+        if (relationship.following || relationship.requested) {
+            OltnGhostButton(
+                text = stringResource(label),
+                onClick = onFollow,
+                enabled = !followBusy
+            )
+        } else {
+            OltnPrimaryButton(
+                text = stringResource(label),
+                onClick = onFollow,
+                enabled = !followBusy
+            )
+        }
     }
 }
 

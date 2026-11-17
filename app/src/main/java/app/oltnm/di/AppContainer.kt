@@ -9,6 +9,7 @@ import app.oltnm.data.model.Session
 import app.oltnm.data.repo.AuthRepository
 import app.oltnm.data.store.DraftStore
 import app.oltnm.data.store.NewsletterStore
+import app.oltnm.data.store.NotificationSeenStore
 import app.oltnm.data.store.PreferencesStore
 import app.oltnm.data.store.SessionStore
 import app.oltnm.data.store.TimelineStore
@@ -22,6 +23,7 @@ class AppContainer(context: Context) {
     val draftStore = DraftStore(context)
     val timelineStore = TimelineStore(context)
     val newsletterStore = NewsletterStore(context)
+    val notificationSeenStore = NotificationSeenStore(context)
     val authRepository = AuthRepository(sessionStore, http)
     val translateApi = TranslateApi(http)
     val giphyApi = GiphyApi(http)

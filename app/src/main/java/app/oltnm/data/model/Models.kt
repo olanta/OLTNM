@@ -37,6 +37,19 @@ data class Account(
 }
 
 @Serializable
+data class Relationship(
+    val id: String = "",
+    val following: Boolean = false,
+    @SerialName("followed_by") val followedBy: Boolean = false,
+    val requested: Boolean = false,
+    val blocking: Boolean = false,
+    val muting: Boolean = false,
+    @SerialName("domain_blocking") val domainBlocking: Boolean = false,
+    val endorsed: Boolean = false,
+    val notifying: Boolean = false
+)
+
+@Serializable
 data class MediaAttachment(
     val id: String = "",
     val type: String = "image",

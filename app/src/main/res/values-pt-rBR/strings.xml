@@ -52,6 +52,14 @@
     <string name="profile_statuses">Publicações</string>
     <string name="profile_followers">Seguidores</string>
     <string name="profile_following">Seguindo</string>
+    <string name="follow">Seguir</string>
+    <string name="follow_back">Seguir de volta</string>
+    <string name="unfollow">Deixar de seguir</string>
+    <string name="cancel_follow_request">Cancelar solicitação</string>
+    <string name="follow_mutual">Mútuo</string>
+    <string name="follow_following">Seguindo</string>
+    <string name="follow_follows_you">Segue você</string>
+    <string name="follow_requested">Solicitado</string>
     <string name="bot_account">Conta automatizada</string>
     <string name="back">Voltar</string>
 

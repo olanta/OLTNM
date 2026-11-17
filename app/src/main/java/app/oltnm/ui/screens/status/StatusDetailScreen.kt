@@ -14,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Block
-import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.AlertDialog
@@ -125,14 +124,6 @@ fun StatusDetailScreen(
                 }
             },
             actions = {
-                if (editableStatus != null) {
-                    IconButton(onClick = { onEdit(editableStatus.original) }) {
-                        Icon(
-                            imageVector = Icons.Rounded.Edit,
-                            contentDescription = stringResource(R.string.edit)
-                        )
-                    }
-                }
                 if (moderationStatus != null) {
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
@@ -239,6 +230,7 @@ fun StatusDetailScreen(
                                         onFavourite = viewModel::toggleFavourite,
                                         onReblog = viewModel::toggleReblog,
                                         onBookmark = viewModel::toggleBookmark,
+                                        onEdit = if (editableStatus != null) onEdit else null,
                                         interactive = interactive
                                     )
                                 }
@@ -260,6 +252,15 @@ fun StatusDetailScreen(
                                         onFavourite = viewModel::toggleFavourite,
                                         onReblog = viewModel::toggleReblog,
                                         onBookmark = viewModel::toggleBookmark,
+                                        onEdit = if (
+                                            interactive &&
+                                            ancestor.original.account.id == currentAccountId &&
+                                            ancestor.poll == null
+                                        ) {
+                                            onEdit
+                                        } else {
+                                            null
+                                        },
                                         interactive = interactive
                                     )
                                 }
@@ -284,6 +285,15 @@ fun StatusDetailScreen(
                                             onFavourite = viewModel::toggleFavourite,
                                             onReblog = viewModel::toggleReblog,
                                             onBookmark = viewModel::toggleBookmark,
+                                            onEdit = if (
+                                                interactive &&
+                                                descendant.original.account.id == currentAccountId &&
+                                                descendant.poll == null
+                                            ) {
+                                                onEdit
+                                            } else {
+                                                null
+                                            },
                                             interactive = interactive
                                         )
                                     }

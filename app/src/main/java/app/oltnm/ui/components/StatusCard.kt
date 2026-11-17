@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Repeat
@@ -69,6 +70,7 @@ fun StatusCard(
     onReblog: (Status) -> Unit,
     onBookmark: (Status) -> Unit,
     modifier: Modifier = Modifier,
+    onEdit: ((Status) -> Unit)? = null,
     interactive: Boolean = true
 ) {
     val displayed = status.original
@@ -216,6 +218,7 @@ fun StatusCard(
                     onFavourite = { onFavourite(status) },
                     onReblog = { onReblog(status) },
                     onBookmark = { onBookmark(status) },
+                    onEdit = onEdit?.let { callback -> { callback(displayed) } },
                     interactive = interactive
                 )
             }
@@ -311,6 +314,7 @@ private fun StatusActions(
     onFavourite: () -> Unit,
     onReblog: () -> Unit,
     onBookmark: () -> Unit,
+    onEdit: (() -> Unit)?,
     interactive: Boolean
 ) {
     val semantics = LocalOltnSemantics.current
@@ -360,6 +364,16 @@ private fun StatusActions(
                 contentDescription = stringResource(R.string.action_bookmark),
                 onClick = onBookmark
             )
+            if (onEdit != null) {
+                StatusAction(
+                    icon = Icons.Rounded.Edit,
+                    count = 0,
+                    tint = MaterialTheme.colorScheme.primary,
+                    active = false,
+                    contentDescription = stringResource(R.string.edit),
+                    onClick = onEdit
+                )
+            }
         }
         Spacer(Modifier.weight(1f))
         IconButton(onClick = { status.displayUrl?.let(onOpenUrl) }) {
