@@ -6,6 +6,7 @@ import app.oltnm.data.api.GifResult
 import app.oltnm.data.api.GiphyApi
 import app.oltnm.data.api.MastodonApi
 import app.oltnm.data.api.TranslateApi
+import app.oltnm.data.model.Account
 import app.oltnm.data.model.Emoji
 import app.oltnm.data.model.PollRequest
 import app.oltnm.data.model.QuotePolicy
@@ -76,6 +77,9 @@ data class ComposeUiState(
     val scheduledAtMillis: Long? = null,
     val customEmojis: List<Emoji> = emptyList(),
     val loadingCustomEmojis: Boolean = false,
+    val mentionQuery: String? = null,
+    val mentionSuggestions: List<Account> = emptyList(),
+    val mentionLoading: Boolean = false,
     val maxChars: Int = MastodonApi.DEFAULT_MAX_CHARS,
     val localVisibilitySupported: Boolean = false
 )
@@ -92,6 +96,7 @@ class ComposeViewModel(
     val state: StateFlow<ComposeUiState> = _state.asStateFlow()
 
     private var draftJob: Job? = null
+    private var mentionJob: Job? = null
 
     init {
         val target = replyTo
@@ -175,6 +180,44 @@ class ComposeViewModel(
             it.copy(text = value, error = null, translation = null)
         }
         scheduleDraftSave()
+    }
+
+    fun onMentionQueryChange(query: String?) {
+        val normalized = query?.takeIf { it.isNotBlank() }
+        if (normalized == _state.value.mentionQuery) return
+        mentionJob?.cancel()
+        if (normalized == null) {
+            _state.update {
+                it.copy(
+                    mentionQuery = null,
+                    mentionSuggestions = emptyList(),
+                    mentionLoading = false
+                )
+            }
+            return
+        }
+        _state.update { it.copy(mentionQuery = normalized, mentionLoading = true) }
+        mentionJob = viewModelScope.launch {
+            delay(250)
+            runCatching { api.searchAccounts(normalized, limit = 5) }
+                .onSuccess { accounts ->
+                    if (_state.value.mentionQuery == normalized) {
+                        _state.update {
+                            it.copy(
+                                mentionSuggestions = accounts.take(5),
+                                mentionLoading = false
+                            )
+                        }
+                    }
+                }
+                .onFailure {
+                    if (_state.value.mentionQuery == normalized) {
+                        _state.update {
+                            it.copy(mentionSuggestions = emptyList(), mentionLoading = false)
+                        }
+                    }
+                }
+        }
     }
 
     fun onSpoilerChange(value: String) {
@@ -682,6 +725,7 @@ class ComposeViewModel(
     }
 
     fun consumePosted() {
+        mentionJob?.cancel()
         val current = _state.value
         if (editStatus != null) {
             _state.value = current.copy(posting = false, posted = false, error = null)

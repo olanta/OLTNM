@@ -228,6 +228,16 @@ class MastodonApi(
         mapOf("q" to query, "resolve" to "true", "limit" to limit.toString())
     )
 
+    suspend fun searchAccounts(query: String, limit: Int = 5): List<Account> = getJson<SearchResults>(
+        "/api/v2/search",
+        mapOf(
+            "q" to query,
+            "type" to "accounts",
+            "resolve" to "false",
+            "limit" to limit.toString()
+        )
+    ).accounts
+
     suspend fun status(statusId: String): Status = getJson<Status>("/api/v1/statuses/$statusId")
 
     suspend fun statusContext(statusId: String): StatusContext = getJson<StatusContext>("/api/v1/statuses/$statusId/context")

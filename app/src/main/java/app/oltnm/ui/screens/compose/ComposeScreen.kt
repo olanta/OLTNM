@@ -83,6 +83,7 @@ import app.oltnm.data.store.DraftStore
 import app.oltnm.data.store.PreferencesStore
 import app.oltnm.ui.components.EmojiPickerSheet
 import app.oltnm.ui.components.GifPickerSheet
+import app.oltnm.ui.components.MentionSuggestions
 import app.oltnm.ui.components.OltnFilterChip
 import app.oltnm.ui.components.OltnGlassCard
 import app.oltnm.ui.components.OltnPrimaryButton
@@ -93,6 +94,7 @@ import app.oltnm.ui.components.OltnTopBar
 import app.oltnm.ui.components.TranslateTargetSheet
 import app.oltnm.ui.factoryOf
 import app.oltnm.util.CodeImage
+import app.oltnm.util.Mentions
 import app.oltnm.util.TextImage
 import app.oltnm.util.TextImageStyle
 import app.oltnm.util.ThreadText
@@ -196,6 +198,7 @@ fun ComposeScreen(
     LaunchedEffect(state.text) {
         if (state.text != input.text) {
             input = TextFieldValue(state.text, TextRange(state.text.length))
+            viewModel.onMentionQueryChange(Mentions.query(state.text, state.text.length))
         }
     }
 
@@ -221,6 +224,7 @@ fun ComposeScreen(
         val newText = input.text.replaceRange(start, end, snippet)
         input = TextFieldValue(newText, TextRange(start + snippet.length))
         viewModel.onTextChange(newText)
+        viewModel.onMentionQueryChange(Mentions.query(newText, start + snippet.length))
     }
 
     val pasteClipboard: () -> Unit = {
@@ -368,9 +372,30 @@ fun ComposeScreen(
                     onValueChange = {
                         input = it
                         viewModel.onTextChange(it.text)
+                        viewModel.onMentionQueryChange(Mentions.query(it.text, it.selection.end))
                     },
                     placeholder = stringResource(R.string.compose_hint),
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+                )
+
+                MentionSuggestions(
+                    accounts = state.mentionSuggestions,
+                    onPick = { account ->
+                        val insertion = Mentions.insert(
+                            text = input.text,
+                            cursor = input.selection.end,
+                            acct = account.acct
+                        )
+                        if (insertion != null) {
+                            input = TextFieldValue(
+                                insertion.text,
+                                TextRange(insertion.cursor)
+                            )
+                            viewModel.onTextChange(insertion.text)
+                        }
+                        viewModel.onMentionQueryChange(null)
+                    },
+                    modifier = Modifier.padding(top = 6.dp)
                 )
 
                 Row(
