@@ -208,13 +208,22 @@ class MastodonApi(
         execute(request(url("/api/v1/scheduled_statuses/$id", emptyMap()), "DELETE"))
     }
 
-    suspend fun accountStatuses(accountId: String, maxId: String? = null, limit: Int = 20): Page<Status> {
+    suspend fun deleteStatus(id: String) {
+        execute(request(url("/api/v1/statuses/$id", emptyMap()), "DELETE"))
+    }
+
+    suspend fun accountStatuses(
+        accountId: String,
+        maxId: String? = null,
+        limit: Int = 20,
+        excludeReplies: Boolean = true
+    ): Page<Status> {
         val raw = getRaw(
             "/api/v1/accounts/$accountId/statuses",
             mapOf(
                 "max_id" to maxId,
                 "limit" to limit.toString(),
-                "exclude_replies" to "true"
+                "exclude_replies" to excludeReplies.toString()
             )
         )
         return Page(
@@ -228,12 +237,16 @@ class MastodonApi(
         mapOf("q" to query, "resolve" to "true", "limit" to limit.toString())
     )
 
-    suspend fun searchAccounts(query: String, limit: Int = 5): List<Account> = getJson<SearchResults>(
+    suspend fun searchAccounts(
+        query: String,
+        limit: Int = 5,
+        resolve: Boolean = false
+    ): List<Account> = getJson<SearchResults>(
         "/api/v2/search",
         mapOf(
             "q" to query,
             "type" to "accounts",
-            "resolve" to "false",
+            "resolve" to resolve.toString(),
             "limit" to limit.toString()
         )
     ).accounts

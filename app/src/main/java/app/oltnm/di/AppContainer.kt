@@ -7,6 +7,7 @@ import app.oltnm.data.api.MastodonApi
 import app.oltnm.data.api.TranslateApi
 import app.oltnm.data.model.Session
 import app.oltnm.data.repo.AuthRepository
+import app.oltnm.data.store.CleanupStore
 import app.oltnm.data.store.DraftStore
 import app.oltnm.data.store.NewsletterStore
 import app.oltnm.data.store.NotificationSeenStore
@@ -24,6 +25,7 @@ class AppContainer(context: Context) {
     val timelineStore = TimelineStore(context)
     val newsletterStore = NewsletterStore(context)
     val notificationSeenStore = NotificationSeenStore(context)
+    val cleanupStore = CleanupStore(context)
     val authRepository = AuthRepository(sessionStore, http)
     val translateApi = TranslateApi(http)
     val giphyApi = GiphyApi(http)

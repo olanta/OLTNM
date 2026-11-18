@@ -100,6 +100,7 @@ data class Status(
     val favourited: Boolean = false,
     val reblogged: Boolean = false,
     val bookmarked: Boolean = false,
+    val pinned: Boolean = false,
     val sensitive: Boolean = false,
     @SerialName("spoiler_text") val spoilerText: String = "",
     val visibility: String = "public",

@@ -321,6 +321,11 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(20.dp))
+            OltnSectionTitle(stringResource(R.string.cleanup_title))
+            Spacer(Modifier.height(8.dp))
+            CleanupSection(container.cleanupStore, session.key)
+
+            Spacer(Modifier.height(20.dp))
             OltnSectionTitle(stringResource(R.string.accounts_title))
             Spacer(Modifier.height(8.dp))
             OltnGlassCard(

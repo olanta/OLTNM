@@ -47,6 +47,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import app.oltnm.R
+import app.oltnm.data.cleanup.CleanupRules
+import app.oltnm.data.cleanup.CleanupRunner
 import app.oltnm.data.model.Session
 import app.oltnm.data.model.Status
 import app.oltnm.data.model.TimelineSpec
@@ -70,6 +72,7 @@ import app.oltnm.ui.screens.timelines.ManageTimelinesScreen
 import app.oltnm.ui.screens.trending.TrendingScreen
 import app.oltnm.ui.theme.OltnTheme
 import app.oltnm.util.OAuthBus
+import app.oltnm.util.OltnLog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -200,6 +203,36 @@ private fun MainScaffold(
                 hasNewNotifications = false
             }
         }
+    }
+
+    LaunchedEffect(api, session.key) {
+        val accountState = container.cleanupStore.load(session.key)
+        if (!CleanupRules.due(accountState.policy, accountState.state)) return@LaunchedEffect
+        val now = System.currentTimeMillis()
+        val result = runCatching {
+            CleanupRunner.run(
+                api = api,
+                accountId = session.accountId,
+                policy = accountState.policy,
+                state = accountState.state,
+                now = now
+            )
+        }.getOrNull() ?: return@LaunchedEffect
+        val cooldown = CleanupRules.cooldownUntil(result, now)
+        container.cleanupStore.saveState(
+            session.key,
+            accountState.state.copy(
+                cursor = result.cursor,
+                inspectedThrough = result.inspectedThrough,
+                lastRun = if (result.stopped) accountState.state.lastRun else now,
+                rateLimitedUntil = cooldown.takeIf { it > now },
+                resumePending = result.stopped
+            )
+        )
+        OltnLog.i(
+            "Cleanup scanned=${result.scanned} deleted=${result.deleted} " +
+                "stopped=${result.stopped}"
+        )
     }
 
     val select: (Route) -> Unit = { next ->
@@ -360,6 +393,7 @@ private fun MainScaffold(
                 )
                 Route.Search -> SearchScreen(
                     api = api,
+                    currentAccountId = session.accountId,
                     onOpenAccount = openAccount,
                     onOpenStatus = { id -> openStatus(id, null) },
                     onReply = openReply

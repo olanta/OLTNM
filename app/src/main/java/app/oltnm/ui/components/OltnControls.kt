@@ -93,6 +93,7 @@ fun OltnTextField(
     singleLine: Boolean = true,
     minLines: Int = 1,
     maxLines: Int = 1,
+    enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     leadingIcon: (@Composable () -> Unit)? = null,
@@ -101,6 +102,7 @@ fun OltnTextField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
+        enabled = enabled,
         placeholder = {
             Text(
                 text = placeholder,
