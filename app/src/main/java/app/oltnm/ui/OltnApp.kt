@@ -394,6 +394,7 @@ private fun MainScaffold(
                 Route.Search -> SearchScreen(
                     api = api,
                     currentAccountId = session.accountId,
+                    instanceHost = session.host,
                     onOpenAccount = openAccount,
                     onOpenStatus = { id -> openStatus(id, null) },
                     onReply = openReply

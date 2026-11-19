@@ -3,6 +3,8 @@ package app.oltnm.data.api
 import app.oltnm.data.model.Account
 import app.oltnm.data.model.AppRegistration
 import app.oltnm.data.model.Emoji
+import app.oltnm.data.model.GroupedNotification
+import app.oltnm.data.model.GroupedNotificationsResult
 import app.oltnm.data.model.InstanceDetails
 import app.oltnm.data.model.InstanceInfo
 import app.oltnm.data.model.InstanceLimits
@@ -139,6 +141,39 @@ class MastodonApi(
             items = json.decodeList<Notification>(raw.body),
             nextMaxId = Pagination.nextMaxId(raw.headers["Link"])
         )
+    }
+
+    suspend fun groupedNotifications(
+        maxId: String? = null,
+        limit: Int = 30
+    ): Page<GroupedNotification> {
+        val builder = (baseUrl.trimEnd('/') + "/api/v2/notifications").toHttpUrl().newBuilder()
+        if (maxId != null) builder.addQueryParameter("max_id", maxId)
+        builder.addQueryParameter("limit", limit.toString())
+        listOf("favourite", "reblog", "follow").forEach {
+            builder.addQueryParameter("grouped_types[]", it)
+        }
+        supportedNotificationTypes.forEach {
+            builder.addQueryParameter("supported_types[]", it)
+        }
+        val text = execute(request(builder.build(), "GET")).body
+        val result = json.decode<GroupedNotificationsResult>(text)
+        val accounts = result.accounts.associateBy { it.id }
+        val statuses = result.statuses.associateBy { it.id }
+        val items = result.notificationGroups.mapNotNull { group ->
+            val groupAccounts = group.sampleAccountIds.mapNotNull { accounts[it] }
+            if (group.sampleAccountIds.isNotEmpty() &&
+                groupAccounts.size != group.sampleAccountIds.size
+            ) {
+                return@mapNotNull null
+            }
+            val status = group.statusId?.let { statuses[it] }
+            if (group.statusId != null && status == null) return@mapNotNull null
+            GroupedNotification(group, groupAccounts, status)
+        }
+        val next = result.notificationGroups.lastOrNull()?.pageMinId
+            ?: result.notificationGroups.lastOrNull()?.pageMaxId
+        return Page(items, next)
     }
 
     suspend fun hashtagTimeline(
@@ -356,6 +391,24 @@ class MastodonApi(
     companion object {
         const val DEFAULT_MAX_CHARS = 500
         private val JSON_MEDIA = "application/json".toMediaType()
+        private val supportedNotificationTypes = listOf(
+            "follow",
+            "follow_request",
+            "mention",
+            "reblog",
+            "favourite",
+            "poll",
+            "status",
+            "update",
+            "severed_relationships",
+            "moderation_warning",
+            "quote",
+            "quoted_update",
+            "admin.sign_up",
+            "admin.report",
+            "added_to_collection",
+            "collection_update"
+        )
 
         suspend fun registerApp(
             host: String,

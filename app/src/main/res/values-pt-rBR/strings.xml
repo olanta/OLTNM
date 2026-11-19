@@ -40,6 +40,14 @@
     <string name="poll_votes">%1$d votos</string>
 
     <string name="notifications_title">Notificações</string>
+    <string name="notifications_all">Tudo</string>
+    <string name="notifications_grouped">Agrupadas</string>
+    <string name="notif_group_favourite_one">%1$s e mais 1 pessoa favoritaram sua publicação</string>
+    <string name="notif_group_favourite_many">%1$s e mais %2$d pessoas favoritaram sua publicação</string>
+    <string name="notif_group_reblog_one">%1$s e mais 1 pessoa republicaram sua publicação</string>
+    <string name="notif_group_reblog_many">%1$s e mais %2$d pessoas republicaram sua publicação</string>
+    <string name="notif_group_follow_one">%1$s e mais 1 pessoa começaram a te seguir</string>
+    <string name="notif_group_follow_many">%1$s e mais %2$d pessoas começaram a te seguir</string>
     <string name="notifications_empty">Nenhuma notificação ainda.</string>
     <string name="notif_follow">%1$s começou a te seguir</string>
     <string name="notif_favourite">%1$s favoritou sua publicação</string>
@@ -82,8 +90,12 @@
     <string name="posted">Publicado</string>
 
     <string name="discover">Descobrir</string>
-    <string name="discover_hint">Encontre pessoas para seguir por tópico.</string>
-    <string name="discover_empty">Nenhum perfil encontrado para este tópico.</string>
+    <string name="discover_hint">Encontre pessoas para seguir por tópico ou idioma.</string>
+    <string name="discover_empty">Nenhum perfil encontrado para esta seleção.</string>
+    <string name="discover_topics">Tópicos</string>
+    <string name="discover_languages">Idiomas</string>
+    <string name="discover_language">Idioma</string>
+    <string name="discover_show_more">Mostrar mais (%1$d)</string>
     <string name="discover_art">Arte</string>
     <string name="discover_books">Livros</string>
     <string name="discover_cinema">Cinema</string>

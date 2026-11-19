@@ -40,6 +40,14 @@
     <string name="poll_votes">%1$d votes</string>
 
     <string name="notifications_title">Notifications</string>
+    <string name="notifications_all">All</string>
+    <string name="notifications_grouped">Grouped</string>
+    <string name="notif_group_favourite_one">%1$s and 1 other favourited your post</string>
+    <string name="notif_group_favourite_many">%1$s and %2$d others favourited your post</string>
+    <string name="notif_group_reblog_one">%1$s and 1 other boosted your post</string>
+    <string name="notif_group_reblog_many">%1$s and %2$d others boosted your post</string>
+    <string name="notif_group_follow_one">%1$s and 1 other followed you</string>
+    <string name="notif_group_follow_many">%1$s and %2$d others followed you</string>
     <string name="notifications_empty">No notifications yet.</string>
     <string name="notif_follow">%1$s followed you</string>
     <string name="notif_favourite">%1$s favourited your post</string>
@@ -82,8 +90,12 @@
     <string name="posted">Posted</string>
 
     <string name="discover">Discover</string>
-    <string name="discover_hint">Find people to follow by topic.</string>
-    <string name="discover_empty">No profiles found for this topic.</string>
+    <string name="discover_hint">Find people to follow by topic or language.</string>
+    <string name="discover_empty">No profiles found for this selection.</string>
+    <string name="discover_topics">Topics</string>
+    <string name="discover_languages">Languages</string>
+    <string name="discover_language">Language</string>
+    <string name="discover_show_more">Show more (%1$d)</string>
     <string name="discover_art">Art</string>
     <string name="discover_books">Books</string>
     <string name="discover_cinema">Cinema</string>
