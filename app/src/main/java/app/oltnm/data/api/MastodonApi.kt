@@ -21,12 +21,18 @@ import app.oltnm.data.model.Tag
 import app.oltnm.data.model.TokenResponse
 import app.oltnm.data.model.TrendLink
 import app.oltnm.data.model.UploadedMedia
+import java.io.IOException
 import java.net.URLEncoder
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.FormBody
 import okhttp3.Headers
 import okhttp3.HttpUrl
@@ -36,6 +42,7 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 
 class MastodonApi(
     private val baseUrl: String,
@@ -53,7 +60,7 @@ class MastodonApi(
         val builder = url("/api/v1/accounts/relationships", emptyMap()).newBuilder()
         accountIds.forEach { builder.addQueryParameter("id[]", it) }
         return execute(request(builder.build(), "GET"))
-            .let { json.decodeList<Relationship>(it.body) }
+            .let { decodeListOffMain<Relationship>(it.body) }
     }
 
     suspend fun follow(accountId: String): Relationship = postJson("/api/v1/accounts/$accountId/follow")
@@ -100,7 +107,7 @@ class MastodonApi(
             mapOf("max_id" to maxId, "limit" to limit.toString())
         )
         return Page(
-            items = json.decodeList<Status>(raw.body),
+            items = decodeListOffMain<Status>(raw.body),
             nextMaxId = Pagination.nextMaxId(raw.headers["Link"])
         )
     }
@@ -115,7 +122,7 @@ class MastodonApi(
             )
         )
         return Page(
-            items = json.decodeList<Status>(raw.body),
+            items = decodeListOffMain<Status>(raw.body),
             nextMaxId = Pagination.nextMaxId(raw.headers["Link"])
         )
     }
@@ -138,7 +145,7 @@ class MastodonApi(
         }
         val raw = execute(request(requestUrl, "GET"))
         return Page(
-            items = json.decodeList<Notification>(raw.body),
+            items = decodeListOffMain<Notification>(raw.body),
             nextMaxId = Pagination.nextMaxId(raw.headers["Link"])
         )
     }
@@ -157,7 +164,7 @@ class MastodonApi(
             builder.addQueryParameter("supported_types[]", it)
         }
         val text = execute(request(builder.build(), "GET")).body
-        val result = json.decode<GroupedNotificationsResult>(text)
+        val result = decodeOffMain<GroupedNotificationsResult>(text)
         val accounts = result.accounts.associateBy { it.id }
         val statuses = result.statuses.associateBy { it.id }
         val items = result.notificationGroups.mapNotNull { group ->
@@ -187,7 +194,7 @@ class MastodonApi(
             mapOf("max_id" to maxId, "limit" to limit.toString())
         )
         return Page(
-            items = json.decodeList<Status>(raw.body),
+            items = decodeListOffMain<Status>(raw.body),
             nextMaxId = Pagination.nextMaxId(raw.headers["Link"])
         )
     }
@@ -202,7 +209,7 @@ class MastodonApi(
             mapOf("max_id" to maxId, "limit" to limit.toString())
         )
         return Page(
-            items = json.decodeList<Status>(raw.body),
+            items = decodeListOffMain<Status>(raw.body),
             nextMaxId = Pagination.nextMaxId(raw.headers["Link"])
         )
     }
@@ -213,7 +220,7 @@ class MastodonApi(
             mapOf("max_id" to maxId, "limit" to limit.toString())
         )
         return Page(
-            items = json.decodeList<Status>(raw.body),
+            items = decodeListOffMain<Status>(raw.body),
             nextMaxId = Pagination.nextMaxId(raw.headers["Link"])
         )
     }
@@ -224,7 +231,7 @@ class MastodonApi(
             mapOf("max_id" to maxId, "limit" to limit.toString())
         )
         return Page(
-            items = json.decodeList<Status>(raw.body),
+            items = decodeListOffMain<Status>(raw.body),
             nextMaxId = Pagination.nextMaxId(raw.headers["Link"])
         )
     }
@@ -262,7 +269,7 @@ class MastodonApi(
             )
         )
         return Page(
-            items = json.decodeList<Status>(raw.body),
+            items = decodeListOffMain<Status>(raw.body),
             nextMaxId = Pagination.nextMaxId(raw.headers["Link"])
         )
     }
@@ -303,16 +310,16 @@ class MastodonApi(
     suspend fun unbookmark(statusId: String): Status = postJson<Status>("/api/v1/statuses/$statusId/unbookmark")
 
     suspend fun postStatus(request: StatusRequest): Status = postRaw("/api/v1/statuses", json.encodeStatusRequest(request))
-        .let { json.decode<Status>(it.body) }
+        .let { decodeOffMain<Status>(it.body) }
 
     suspend fun updateStatus(statusId: String, payload: StatusRequest): Status {
         val body = json.encodeStatusRequest(payload).toRequestBody(JSON_MEDIA)
         return execute(request(url("/api/v1/statuses/$statusId", emptyMap()), "PUT", body))
-            .let { json.decode<Status>(it.body) }
+            .let { decodeOffMain<Status>(it.body) }
     }
 
     suspend fun scheduleStatus(request: StatusRequest): ScheduledStatus = postRaw("/api/v1/statuses", json.encodeStatusRequest(request))
-        .let { json.decode<ScheduledStatus>(it.body) }
+        .let { decodeOffMain<ScheduledStatus>(it.body) }
 
     suspend fun customEmojis(): List<Emoji> = getJson<List<Emoji>>("/api/v1/custom_emojis")
 
@@ -336,7 +343,7 @@ class MastodonApi(
             }
             .build()
         val raw = execute(request(url("/api/v1/media", emptyMap()), "POST", body))
-        return json.decode<UploadedMedia>(raw.body)
+        return decodeOffMain<UploadedMedia>(raw.body)
     }
 
     suspend fun updateMediaDescription(mediaId: String, description: String): UploadedMedia {
@@ -344,7 +351,7 @@ class MastodonApi(
             .add("description", description)
             .build()
         val raw = execute(request(url("/api/v1/media/$mediaId", emptyMap()), "PUT", form))
-        return json.decode<UploadedMedia>(raw.body)
+        return decodeOffMain<UploadedMedia>(raw.body)
     }
 
     private fun url(path: String, query: Map<String, String?>): HttpUrl {
@@ -369,21 +376,54 @@ class MastodonApi(
 
     private suspend fun postRaw(path: String, body: String): RawResponse = execute(request(url(path, emptyMap()), "POST", body.toRequestBody(JSON_MEDIA)))
 
+    private suspend inline fun <reified T> decodeOffMain(body: String): T = withContext(Dispatchers.Default) {
+        json.decode<T>(body)
+    }
+
+    private suspend inline fun <reified T> decodeListOffMain(body: String): List<T> = withContext(Dispatchers.Default) {
+        json.decodeList<T>(body)
+    }
+
     private suspend inline fun <reified T> getJson(
         path: String,
         query: Map<String, String?> = emptyMap()
-    ): T = execute(request(url(path, query), "GET")).let { json.decode(it.body) }
+    ): T = execute(request(url(path, query), "GET")).let { decodeOffMain(it.body) }
 
-    private suspend inline fun <reified T> postJson(path: String): T = postRaw(path, "{}").let { json.decode(it.body) }
+    private suspend inline fun <reified T> postJson(path: String): T = postRaw(path, "{}").let { decodeOffMain(it.body) }
 
-    private suspend fun execute(request: Request): RawResponse = withContext(Dispatchers.IO) {
-        http.newCall(request).execute().use { response ->
-            val text = response.body?.string().orEmpty()
-            if (!response.isSuccessful) {
-                throw MastodonApiException(response.code, errorMessage(response.code, text))
+    private suspend fun execute(request: Request): RawResponse = suspendCancellableCoroutine { continuation ->
+        val call = http.newCall(request)
+        continuation.invokeOnCancellation { call.cancel() }
+        call.enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                if (!continuation.isCancelled) {
+                    continuation.resumeWithException(e)
+                }
             }
-            RawResponse(text, response.headers)
-        }
+
+            override fun onResponse(call: Call, response: Response) {
+                response.use {
+                    try {
+                        val text = it.body?.string().orEmpty()
+                        if (continuation.isCancelled) return@use
+                        if (!it.isSuccessful) {
+                            continuation.resumeWithException(
+                                MastodonApiException(
+                                    it.code,
+                                    errorMessage(it.code, text)
+                                )
+                            )
+                        } else {
+                            continuation.resume(RawResponse(text, it.headers))
+                        }
+                    } catch (error: IOException) {
+                        if (!continuation.isCancelled) {
+                            continuation.resumeWithException(error)
+                        }
+                    }
+                }
+            }
+        })
     }
 
     private data class RawResponse(val body: String, val headers: Headers)

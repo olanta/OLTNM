@@ -53,6 +53,7 @@ import app.oltnm.data.model.Session
 import app.oltnm.data.model.Status
 import app.oltnm.data.model.TimelineSpec
 import app.oltnm.data.model.TimelineTypes
+import app.oltnm.data.store.TimelineCacheStore
 import app.oltnm.di.AppContainer
 import app.oltnm.ui.components.Avatar
 import app.oltnm.ui.components.EmptyView
@@ -162,6 +163,8 @@ fun TimelineScreen(
                     remoteApi = remoteApi,
                     interactive = true,
                     refreshSignal = refreshSignal,
+                    cacheStore = container.timelineCacheStore,
+                    cacheKey = "${session.key}|${selected.id}|${selected.host.orEmpty()}",
                     onOpenAccount = onOpenAccount,
                     onOpenStatus = { id -> onOpenStatus(id, remoteHost) },
                     onReply = if (remote) onReplyRemote else onReply
@@ -235,11 +238,15 @@ private fun TimelineView(
     refreshSignal: Int,
     onOpenAccount: (String) -> Unit,
     onOpenStatus: (String) -> Unit,
-    onReply: (Status) -> Unit
+    onReply: (Status) -> Unit,
+    cacheStore: TimelineCacheStore? = null,
+    cacheKey: String? = null
 ) {
     val viewModel: TimelineViewModel = viewModel(
         key = "timeline-${spec.id}-${spec.host}-${ownApi.hashCode()}",
-        factory = factoryOf { TimelineViewModel(spec, ownApi, remoteApi) }
+        factory = factoryOf {
+            TimelineViewModel(spec, ownApi, remoteApi, cacheStore, cacheKey)
+        }
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
     val openUrl = rememberOpenUrl()

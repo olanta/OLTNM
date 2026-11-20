@@ -7,7 +7,10 @@ import app.oltnm.data.api.Page
 import app.oltnm.data.model.Status
 import app.oltnm.data.model.TimelineSpec
 import app.oltnm.data.model.TimelineTypes
+import app.oltnm.data.store.TimelineCacheStore
 import app.oltnm.util.userMessage
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +29,9 @@ data class TimelineUiState(
 class TimelineViewModel(
     private val spec: TimelineSpec,
     private val ownApi: MastodonApi,
-    private val remoteApi: MastodonApi?
+    private val remoteApi: MastodonApi?,
+    private val cacheStore: TimelineCacheStore? = null,
+    private val cacheKey: String? = null
 ) : ViewModel() {
     private val isRemote = spec.type == TimelineTypes.REMOTE_LOCAL ||
         spec.type == TimelineTypes.REMOTE_FEDERATED
@@ -35,13 +40,17 @@ class TimelineViewModel(
     private val _state = MutableStateFlow(TimelineUiState())
     val state: StateFlow<TimelineUiState> = _state.asStateFlow()
 
+    private var refreshJob: Job? = null
+    private var loadMoreJob: Job? = null
+
     init {
-        refresh()
+        restoreCacheAndRefresh()
     }
 
     fun refresh() {
-        if (_state.value.refreshing) return
-        viewModelScope.launch {
+        refreshJob?.cancel()
+        loadMoreJob?.cancel()
+        refreshJob = viewModelScope.launch {
             _state.update {
                 it.copy(
                     refreshing = it.items.isNotEmpty(),
@@ -49,45 +58,72 @@ class TimelineViewModel(
                     error = null
                 )
             }
-            runCatching { fetch(null) }
-                .onSuccess { page ->
-                    _state.update {
-                        it.copy(
-                            items = page.items,
-                            nextMaxId = page.nextMaxId,
-                            loading = false,
-                            refreshing = false
-                        )
-                    }
+            try {
+                val page = fetch(null)
+                _state.update {
+                    it.copy(
+                        items = page.items,
+                        nextMaxId = page.nextMaxId,
+                        loading = false,
+                        refreshing = false
+                    )
                 }
-                .onFailure { error ->
-                    _state.update {
-                        it.copy(loading = false, refreshing = false, error = error.userMessage())
-                    }
+                cacheKey?.let { key ->
+                    cacheStore?.write(key, page.items, page.nextMaxId)
                 }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _state.update {
+                    it.copy(loading = false, refreshing = false, error = error.userMessage())
+                }
+            } finally {
+                if (refreshJob === coroutineContext[Job]) refreshJob = null
+            }
         }
     }
 
     fun loadMore() {
+        if (loadMoreJob?.isActive == true) return
         val snapshot = _state.value
         if (snapshot.loadingMore || snapshot.refreshing || snapshot.nextMaxId == null) return
-        viewModelScope.launch {
+        val maxId = snapshot.nextMaxId
+        loadMoreJob = viewModelScope.launch {
             _state.update { it.copy(loadingMore = true, error = null) }
-            runCatching { fetch(snapshot.nextMaxId) }
-                .onSuccess { page ->
-                    _state.update {
-                        it.copy(
-                            items = (it.items + page.items).distinctBy(Status::id),
-                            nextMaxId = page.nextMaxId,
-                            loadingMore = false
-                        )
-                    }
+            try {
+                val page = fetch(maxId)
+                _state.update {
+                    it.copy(
+                        items = (it.items + page.items).distinctBy(Status::id),
+                        nextMaxId = page.nextMaxId,
+                        loadingMore = false
+                    )
                 }
-                .onFailure { error ->
-                    _state.update {
-                        it.copy(loadingMore = false, error = error.userMessage())
-                    }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _state.update {
+                    it.copy(loadingMore = false, error = error.userMessage())
                 }
+            } finally {
+                if (loadMoreJob === coroutineContext[Job]) loadMoreJob = null
+            }
+        }
+    }
+
+    private fun restoreCacheAndRefresh() {
+        viewModelScope.launch {
+            val cached = cacheKey?.let { key -> cacheStore?.read(key) }
+            if (cached != null && cached.items.isNotEmpty() && _state.value.items.isEmpty()) {
+                _state.update {
+                    it.copy(
+                        items = cached.items,
+                        nextMaxId = cached.nextMaxId,
+                        loading = false
+                    )
+                }
+            }
+            refresh()
         }
     }
 

@@ -13,6 +13,7 @@ import app.oltnm.data.store.NewsletterStore
 import app.oltnm.data.store.NotificationSeenStore
 import app.oltnm.data.store.PreferencesStore
 import app.oltnm.data.store.SessionStore
+import app.oltnm.data.store.TimelineCacheStore
 import app.oltnm.data.store.TimelineStore
 import app.oltnm.util.Instances
 
@@ -23,6 +24,7 @@ class AppContainer(context: Context) {
     val preferences = PreferencesStore(context)
     val draftStore = DraftStore(context)
     val timelineStore = TimelineStore(context)
+    val timelineCacheStore = TimelineCacheStore(context)
     val newsletterStore = NewsletterStore(context)
     val notificationSeenStore = NotificationSeenStore(context)
     val cleanupStore = CleanupStore(context)
