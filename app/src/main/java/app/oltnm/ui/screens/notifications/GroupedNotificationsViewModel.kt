@@ -4,8 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.oltnm.data.api.MastodonApi
 import app.oltnm.data.api.Page
+import app.oltnm.data.filters.FilterMatcher
+import app.oltnm.data.filters.FilterStore
 import app.oltnm.data.model.GroupedNotification
 import app.oltnm.data.model.NotificationGroup
+import app.oltnm.data.model.Status
 import app.oltnm.data.notifications.NotificationEntry
 import app.oltnm.data.notifications.NotificationGrouping
 import app.oltnm.util.userMessage
@@ -26,7 +29,8 @@ data class GroupedNotificationsUiState(
 )
 
 class GroupedNotificationsViewModel(
-    private val api: MastodonApi
+    private val api: MastodonApi,
+    private val filterStore: FilterStore? = null
 ) : ViewModel() {
     private val _state = MutableStateFlow(GroupedNotificationsUiState())
     val state: StateFlow<GroupedNotificationsUiState> = _state.asStateFlow()
@@ -93,11 +97,27 @@ class GroupedNotificationsViewModel(
     }
 
     private suspend fun fetch(maxId: String?): Page<GroupedNotification> {
-        if (!_state.value.fallback) {
+        filterStore?.ensureLoaded(api)
+        val page = if (!_state.value.fallback) {
             val grouped = runCatching { api.groupedNotifications(maxId = maxId) }
-            if (grouped.isSuccess) return grouped.getOrThrow()
-            _state.update { it.copy(fallback = true) }
+            if (grouped.isSuccess) {
+                grouped.getOrThrow()
+            } else {
+                _state.update { it.copy(fallback = true) }
+                fallbackPage(maxId)
+            }
+        } else {
+            fallbackPage(maxId)
         }
+        return Page(
+            items = page.items.filterNot { item ->
+                item.status?.let(::isHidden) == true
+            },
+            nextMaxId = page.nextMaxId
+        )
+    }
+
+    private suspend fun fallbackPage(maxId: String?): Page<GroupedNotification> {
         val page = api.notifications(maxId = maxId)
         return Page(
             items = NotificationGrouping.group(page.items).map {
@@ -106,6 +126,12 @@ class GroupedNotificationsViewModel(
             nextMaxId = page.nextMaxId
         )
     }
+
+    private fun isHidden(status: Status): Boolean = FilterMatcher.isHidden(
+        status = status,
+        filters = filterStore?.filters?.value.orEmpty(),
+        context = "notifications"
+    )
 }
 
 private fun NotificationEntry.toGroupedNotification(): GroupedNotification = when (this) {

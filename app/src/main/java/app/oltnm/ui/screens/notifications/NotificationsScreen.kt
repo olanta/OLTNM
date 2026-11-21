@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.oltnm.R
 import app.oltnm.data.api.MastodonApi
+import app.oltnm.data.filters.FilterStore
 import app.oltnm.data.model.GroupedNotification
 import app.oltnm.data.model.Notification
 import app.oltnm.data.model.Status
@@ -71,12 +72,16 @@ private enum class NotificationsTab(@StringRes val labelRes: Int) {
 fun NotificationsScreen(
     api: MastodonApi,
     onOpenAccount: (String) -> Unit,
-    onOpenStatus: (String) -> Unit
+    onOpenStatus: (String) -> Unit,
+    filterStore: FilterStore? = null
 ) {
-    val viewModel: NotificationsViewModel = viewModel(key = "notifications-${api.hashCode()}", factory = factoryOf { NotificationsViewModel(api) })
+    val viewModel: NotificationsViewModel = viewModel(
+        key = "notifications-${api.hashCode()}",
+        factory = factoryOf { NotificationsViewModel(api, filterStore) }
+    )
     val groupedViewModel: GroupedNotificationsViewModel = viewModel(
         key = "grouped-notifications-${api.hashCode()}",
-        factory = factoryOf { GroupedNotificationsViewModel(api) }
+        factory = factoryOf { GroupedNotificationsViewModel(api, filterStore) }
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
     val groupedState by groupedViewModel.state.collectAsStateWithLifecycle()

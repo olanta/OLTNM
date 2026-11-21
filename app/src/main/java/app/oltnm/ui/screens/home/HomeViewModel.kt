@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.oltnm.data.api.MastodonApi
 import app.oltnm.data.api.Page
+import app.oltnm.data.filters.FilterMatcher
+import app.oltnm.data.filters.FilterStore
+import app.oltnm.data.filters.FilteredStatuses
 import app.oltnm.data.model.Status
 import app.oltnm.data.model.TimelineSpec
 import app.oltnm.data.model.TimelineTypes
@@ -23,6 +26,7 @@ data class TimelineUiState(
     val refreshing: Boolean = false,
     val loadingMore: Boolean = false,
     val nextMaxId: String? = null,
+    val warnings: Map<String, String> = emptyMap(),
     val error: String? = null
 )
 
@@ -31,7 +35,8 @@ class TimelineViewModel(
     private val ownApi: MastodonApi,
     private val remoteApi: MastodonApi?,
     private val cacheStore: TimelineCacheStore? = null,
-    private val cacheKey: String? = null
+    private val cacheKey: String? = null,
+    private val filterStore: FilterStore? = null
 ) : ViewModel() {
     private val isRemote = spec.type == TimelineTypes.REMOTE_LOCAL ||
         spec.type == TimelineTypes.REMOTE_FEDERATED
@@ -59,17 +64,18 @@ class TimelineViewModel(
                 )
             }
             try {
-                val page = fetch(null)
+                val filtered = fetch(null)
                 _state.update {
                     it.copy(
-                        items = page.items,
-                        nextMaxId = page.nextMaxId,
+                        items = filtered.items,
+                        nextMaxId = filtered.nextMaxId,
+                        warnings = filtered.warnings,
                         loading = false,
                         refreshing = false
                     )
                 }
                 cacheKey?.let { key ->
-                    cacheStore?.write(key, page.items, page.nextMaxId)
+                    cacheStore?.write(key, filtered.items, filtered.nextMaxId)
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -91,11 +97,12 @@ class TimelineViewModel(
         loadMoreJob = viewModelScope.launch {
             _state.update { it.copy(loadingMore = true, error = null) }
             try {
-                val page = fetch(maxId)
+                val filtered = fetch(maxId)
                 _state.update {
                     it.copy(
-                        items = (it.items + page.items).distinctBy(Status::id),
-                        nextMaxId = page.nextMaxId,
+                        items = (it.items + filtered.items).distinctBy(Status::id),
+                        nextMaxId = filtered.nextMaxId,
+                        warnings = it.warnings + filtered.warnings,
                         loadingMore = false
                     )
                 }
@@ -142,7 +149,13 @@ class TimelineViewModel(
         }
         viewModelScope.launch {
             runCatching { if (next) ownApi.favourite(target.id) else ownApi.unfavourite(target.id) }
-                .onSuccess { server -> updateStatus(server.id) { server } }
+                .onSuccess { server ->
+                    if (!next && spec.type == TimelineTypes.FAVOURITES) {
+                        removeStatus(server.id)
+                    } else {
+                        updateStatus(server.id) { server }
+                    }
+                }
                 .onFailure { error ->
                     updateStatus(target.id) {
                         it.copy(
@@ -197,7 +210,13 @@ class TimelineViewModel(
             runCatching {
                 if (next) ownApi.bookmark(target.id) else ownApi.unbookmark(target.id)
             }
-                .onSuccess { server -> updateStatus(server.id) { server } }
+                .onSuccess { server ->
+                    if (!next && spec.type == TimelineTypes.BOOKMARKS) {
+                        removeStatus(server.id)
+                    } else {
+                        updateStatus(server.id) { server }
+                    }
+                }
                 .onFailure { error ->
                     updateStatus(target.id) { it.copy(bookmarked = !next) }
                     _state.update { it.copy(error = error.userMessage()) }
@@ -308,33 +327,50 @@ class TimelineViewModel(
         _state.update { it.copy(error = null) }
     }
 
-    private suspend fun fetch(maxId: String?): Page<Status> = when (spec.type) {
-        TimelineTypes.HOME -> ownApi.homeTimeline(maxId = maxId)
-        TimelineTypes.LOCAL -> ownApi.publicTimeline(local = true, maxId = maxId)
-        TimelineTypes.FEDERATED -> ownApi.publicTimeline(local = false, maxId = maxId)
-        TimelineTypes.REMOTE_LOCAL -> sourceApi.publicTimeline(local = true, maxId = maxId)
-        TimelineTypes.REMOTE_FEDERATED -> sourceApi.publicTimeline(local = false, maxId = maxId)
-        TimelineTypes.HASHTAG -> ownApi.hashtagTimeline(
-            tag = spec.value.orEmpty(),
-            maxId = maxId
-        )
-        TimelineTypes.LIST -> ownApi.listTimeline(
-            listId = spec.value.orEmpty(),
-            maxId = maxId
-        )
-        TimelineTypes.BOOKMARKS -> ownApi.bookmarks(maxId = maxId)
-        TimelineTypes.FAVOURITES -> ownApi.favourites(maxId = maxId)
-        TimelineTypes.MENTIONS -> {
-            val page = ownApi.notifications(
-                maxId = maxId,
-                types = listOf("mention")
+    private suspend fun fetch(maxId: String?): FilteredStatuses {
+        val page = when (spec.type) {
+            TimelineTypes.HOME -> ownApi.homeTimeline(maxId = maxId)
+            TimelineTypes.LOCAL -> ownApi.publicTimeline(local = true, maxId = maxId)
+            TimelineTypes.FEDERATED -> ownApi.publicTimeline(local = false, maxId = maxId)
+            TimelineTypes.REMOTE_LOCAL -> sourceApi.publicTimeline(local = true, maxId = maxId)
+            TimelineTypes.REMOTE_FEDERATED -> sourceApi.publicTimeline(local = false, maxId = maxId)
+            TimelineTypes.HASHTAG -> ownApi.hashtagTimeline(
+                tag = spec.value.orEmpty(),
+                maxId = maxId
             )
-            Page(
-                items = page.items.mapNotNull { it.status }.distinctBy(Status::id),
-                nextMaxId = page.nextMaxId
+            TimelineTypes.LIST -> ownApi.listTimeline(
+                listId = spec.value.orEmpty(),
+                maxId = maxId
             )
+            TimelineTypes.BOOKMARKS -> ownApi.bookmarks(maxId = maxId)
+            TimelineTypes.FAVOURITES -> ownApi.favourites(maxId = maxId)
+            TimelineTypes.MENTIONS -> {
+                val notifications = ownApi.notifications(
+                    maxId = maxId,
+                    types = listOf("mention")
+                )
+                Page(
+                    items = notifications.items
+                        .mapNotNull { it.status }
+                        .distinctBy(Status::id),
+                    nextMaxId = notifications.nextMaxId
+                )
+            }
+            else -> Page(emptyList(), null)
         }
-        else -> Page(emptyList(), null)
+        filterStore?.ensureLoaded(ownApi)
+        return FilterMatcher.apply(
+            items = page.items,
+            filters = filterStore?.filters?.value.orEmpty(),
+            context = filterContext(),
+            nextMaxId = page.nextMaxId
+        )
+    }
+
+    private fun filterContext(): String = when (spec.type) {
+        TimelineTypes.HOME -> "home"
+        TimelineTypes.MENTIONS -> "notifications"
+        else -> "public"
     }
 
     private fun updateStatus(id: String, transform: (Status) -> Status) {
@@ -348,6 +384,12 @@ class TimelineViewModel(
                     }
                 }
             )
+        }
+    }
+
+    private fun removeStatus(id: String) {
+        _state.update { current ->
+            current.copy(items = current.items.filterNot { item -> item.id == id })
         }
     }
 

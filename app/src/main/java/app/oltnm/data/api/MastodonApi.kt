@@ -1,13 +1,16 @@
 package app.oltnm.data.api
 
 import app.oltnm.data.model.Account
+import app.oltnm.data.model.Announcement
 import app.oltnm.data.model.AppRegistration
 import app.oltnm.data.model.Emoji
+import app.oltnm.data.model.FilterRequest
 import app.oltnm.data.model.GroupedNotification
 import app.oltnm.data.model.GroupedNotificationsResult
 import app.oltnm.data.model.InstanceDetails
 import app.oltnm.data.model.InstanceInfo
 import app.oltnm.data.model.InstanceLimits
+import app.oltnm.data.model.MastodonFilter
 import app.oltnm.data.model.MastodonList
 import app.oltnm.data.model.Notification
 import app.oltnm.data.model.Relationship
@@ -67,8 +70,63 @@ class MastodonApi(
 
     suspend fun unfollow(accountId: String): Relationship = postJson("/api/v1/accounts/$accountId/unfollow")
 
-    suspend fun blockAccount(accountId: String) {
-        postRaw("/api/v1/accounts/$accountId/block", "{}")
+    suspend fun muteAccount(accountId: String): Relationship = postJson("/api/v1/accounts/$accountId/mute")
+
+    suspend fun unmuteAccount(accountId: String): Relationship = postJson("/api/v1/accounts/$accountId/unmute")
+
+    suspend fun blockAccount(accountId: String): Relationship = postJson("/api/v1/accounts/$accountId/block")
+
+    suspend fun unblockAccount(accountId: String): Relationship = postJson("/api/v1/accounts/$accountId/unblock")
+
+    suspend fun followRequests(maxId: String? = null, limit: Int = 40): Page<Account> {
+        val raw = getRaw(
+            "/api/v1/follow_requests",
+            mapOf("max_id" to maxId, "limit" to limit.toString())
+        )
+        return Page(
+            items = decodeListOffMain<Account>(raw.body),
+            nextMaxId = Pagination.nextMaxId(raw.headers["Link"])
+        )
+    }
+
+    suspend fun authorizeFollowRequest(accountId: String) {
+        postRaw("/api/v1/follow_requests/$accountId/authorize", "{}")
+    }
+
+    suspend fun rejectFollowRequest(accountId: String) {
+        postRaw("/api/v1/follow_requests/$accountId/reject", "{}")
+    }
+
+    suspend fun mutes(maxId: String? = null, limit: Int = 40): Page<Account> {
+        val raw = getRaw(
+            "/api/v1/mutes",
+            mapOf("max_id" to maxId, "limit" to limit.toString())
+        )
+        return Page(
+            items = decodeListOffMain<Account>(raw.body),
+            nextMaxId = Pagination.nextMaxId(raw.headers["Link"])
+        )
+    }
+
+    suspend fun domainBlocks(limit: Int = 100): List<String> = getJson(
+        "/api/v1/domain_blocks",
+        mapOf("limit" to limit.toString())
+    )
+
+    suspend fun blockDomain(domain: String) {
+        val form = FormBody.Builder()
+            .add("domain", domain.trim())
+            .build()
+        execute(request(url("/api/v1/domain_blocks", emptyMap()), "POST", form))
+    }
+
+    suspend fun unblockDomain(domain: String) {
+        execute(
+            request(
+                url("/api/v1/domain_blocks", mapOf("domain" to domain)),
+                "DELETE"
+            )
+        )
     }
 
     suspend fun reportAccount(accountId: String, statusId: String?, comment: String) {
@@ -237,6 +295,40 @@ class MastodonApi(
     }
 
     suspend fun lists(): List<MastodonList> = getJson("/api/v1/lists")
+
+    suspend fun followedTags(maxId: String? = null, limit: Int = 100): Page<Tag> {
+        val raw = getRaw(
+            "/api/v1/followed_tags",
+            mapOf("max_id" to maxId, "limit" to limit.toString())
+        )
+        return Page(
+            items = decodeListOffMain<Tag>(raw.body),
+            nextMaxId = Pagination.nextMaxId(raw.headers["Link"])
+        )
+    }
+
+    suspend fun unfollowTag(name: String): Tag = postJson(
+        "/api/v1/tags/${URLEncoder.encode(name, "UTF-8")}/unfollow"
+    )
+
+    suspend fun announcements(): List<Announcement> = getJson("/api/v1/announcements")
+
+    suspend fun dismissAnnouncement(id: String) {
+        postRaw("/api/v1/announcements/$id/dismiss", "{}")
+    }
+
+    suspend fun filters(): List<MastodonFilter> = getJson("/api/v2/filters")
+
+    suspend fun createFilter(request: FilterRequest): MastodonFilter {
+        val body = JsonConfig.json.encodeToString(FilterRequest.serializer(), request)
+        return postRaw("/api/v2/filters", body).let {
+            decodeOffMain<MastodonFilter>(it.body)
+        }
+    }
+
+    suspend fun deleteFilter(id: String) {
+        execute(request(url("/api/v2/filters/$id", emptyMap()), "DELETE"))
+    }
 
     suspend fun trendingLinks(limit: Int = 20): List<TrendLink> = getJson("/api/v1/trends/links", mapOf("limit" to limit.toString()))
 

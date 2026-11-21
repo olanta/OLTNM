@@ -60,6 +60,7 @@ fun TrendingScreen(
     api: MastodonApi,
     onBack: () -> Unit,
     onOpenHashtag: (String) -> Unit,
+    onOpenAccount: (String) -> Unit,
     onOpenStatus: (String) -> Unit,
     onReply: (Status) -> Unit
 ) {
@@ -126,7 +127,7 @@ fun TrendingScreen(
                         items(state.posts, key = { it.id }) { status ->
                             StatusCard(
                                 status = status,
-                                onOpenAccount = {},
+                                onOpenAccount = onOpenAccount,
                                 onOpenStatus = { onOpenStatus(it.original.id) },
                                 onReply = onReply,
                                 onOpenUrl = openUrl,

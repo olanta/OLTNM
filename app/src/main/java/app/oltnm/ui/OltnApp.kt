@@ -49,6 +49,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import app.oltnm.R
 import app.oltnm.data.cleanup.CleanupRules
 import app.oltnm.data.cleanup.CleanupRunner
+import app.oltnm.data.filters.FilterMatcher
+import app.oltnm.data.filters.FilterStore
+import app.oltnm.data.model.Notification
 import app.oltnm.data.model.Session
 import app.oltnm.data.model.Status
 import app.oltnm.data.model.TimelineSpec
@@ -56,11 +59,15 @@ import app.oltnm.data.model.TimelineTypes
 import app.oltnm.di.AppContainer
 import app.oltnm.ui.screens.compose.ComposeScreen
 import app.oltnm.ui.screens.compose.ReplyTarget
+import app.oltnm.ui.screens.content.AnnouncementsScreen
+import app.oltnm.ui.screens.content.FiltersScreen
+import app.oltnm.ui.screens.content.FollowedTagsScreen
 import app.oltnm.ui.screens.diagnostics.DiagnosticsScreen
 import app.oltnm.ui.screens.home.StatusTimelineScreen
 import app.oltnm.ui.screens.home.TimelineScreen
 import app.oltnm.ui.screens.lists.ListsScreen
 import app.oltnm.ui.screens.login.LoginScreen
+import app.oltnm.ui.screens.moderation.ModerationScreen
 import app.oltnm.ui.screens.newsletter.NewsletterScreen
 import app.oltnm.ui.screens.notifications.NotificationsScreen
 import app.oltnm.ui.screens.profile.ProfileScreen
@@ -87,6 +94,10 @@ sealed interface Route {
     data object Lists : Route
     data object Trending : Route
     data object Scheduled : Route
+    data object Moderation : Route
+    data object FollowedTags : Route
+    data object Filters : Route
+    data object Announcements : Route
     data object Diagnostics : Route
     data class Profile(val accountId: String) : Route
     data class StatusTimeline(val spec: TimelineSpec, val title: String) : Route
@@ -177,10 +188,14 @@ private fun MainScaffold(
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
 
     LaunchedEffect(api, session.key) {
+        container.filterStore.refresh(api)
+    }
+
+    LaunchedEffect(api, session.key) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             while (isActive) {
                 val latest = runCatching {
-                    api.notifications(limit = 1).items.firstOrNull()
+                    latestVisibleNotification(api, container.filterStore)
                 }.getOrNull()
                 if (latest != null) {
                     latestNotificationId = latest.id
@@ -195,7 +210,7 @@ private fun MainScaffold(
     LaunchedEffect(route, latestNotificationId, session.key) {
         if (route == Route.Notifications) {
             val id = latestNotificationId ?: runCatching {
-                api.notifications(limit = 1).items.firstOrNull()?.id
+                latestVisibleNotification(api, container.filterStore)?.id
             }.getOrNull()
             if (id != null) {
                 container.notificationSeenStore.markSeen(session.key, id)
@@ -249,10 +264,14 @@ private fun MainScaffold(
         stack.add(Route.StatusDetail(statusId, host))
     }
     val openReply: (Status) -> Unit = { status ->
-        stack.add(Route.ComposeReply(ReplyTarget.from(status)))
+        stack.add(Route.ComposeReply(ReplyTarget.from(status, session.accountId)))
     }
     val openRemoteReply: (Status) -> Unit = { status ->
-        stack.add(Route.ComposeReply(ReplyTarget.from(status, resolve = true)))
+        stack.add(
+            Route.ComposeReply(
+                ReplyTarget.from(status, currentAccountId = session.accountId, resolve = true)
+            )
+        )
     }
     val back: () -> Unit = {
         if (stack.size > 1) stack.removeAt(stack.lastIndex)
@@ -397,6 +416,19 @@ private fun MainScaffold(
                     instanceHost = session.host,
                     onOpenAccount = openAccount,
                     onOpenStatus = { id -> openStatus(id, null) },
+                    onOpenTag = { name ->
+                        navigate(
+                            Route.StatusTimeline(
+                                TimelineSpec(
+                                    id = "tag-$name",
+                                    type = TimelineTypes.HASHTAG,
+                                    value = name,
+                                    label = "#$name"
+                                ),
+                                "#$name"
+                            )
+                        )
+                    },
                     onReply = openReply
                 )
                 Route.Compose -> ComposeScreen(
@@ -411,7 +443,8 @@ private fun MainScaffold(
                 Route.Notifications -> NotificationsScreen(
                     api = api,
                     onOpenAccount = openAccount,
-                    onOpenStatus = { id -> openStatus(id, null) }
+                    onOpenStatus = { id -> openStatus(id, null) },
+                    filterStore = container.filterStore
                 )
                 Route.Settings -> SettingsScreen(
                     container = container,
@@ -426,6 +459,34 @@ private fun MainScaffold(
                     api = api,
                     onBack = back
                 )
+                Route.Moderation -> ModerationScreen(
+                    api = api,
+                    onBack = back,
+                    onOpenAccount = openAccount
+                )
+                Route.FollowedTags -> FollowedTagsScreen(
+                    api = api,
+                    onBack = back,
+                    onOpenTag = { name ->
+                        navigate(
+                            Route.StatusTimeline(
+                                TimelineSpec(
+                                    id = "tag-$name",
+                                    type = TimelineTypes.HASHTAG,
+                                    value = name,
+                                    label = "#$name"
+                                ),
+                                "#$name"
+                            )
+                        )
+                    }
+                )
+                Route.Filters -> FiltersScreen(
+                    api = api,
+                    onBack = back,
+                    filterStore = container.filterStore
+                )
+                Route.Announcements -> AnnouncementsScreen(api = api, onBack = back)
                 Route.Newsletter -> NewsletterScreen(
                     container = container,
                     api = api,
@@ -454,6 +515,7 @@ private fun MainScaffold(
                 Route.Trending -> TrendingScreen(
                     api = api,
                     onBack = back,
+                    onOpenAccount = openAccount,
                     onOpenStatus = { id -> openStatus(id, null) },
                     onReply = openReply,
                     onOpenHashtag = { name ->
@@ -482,7 +544,8 @@ private fun MainScaffold(
                     onBack = back,
                     onOpenAccount = openAccount,
                     onOpenStatus = { id -> openStatus(id, null) },
-                    onReply = openReply
+                    onReply = openReply,
+                    filterStore = container.filterStore
                 )
                 is Route.StatusTimeline -> StatusTimelineScreen(
                     api = api,
@@ -491,7 +554,8 @@ private fun MainScaffold(
                     onBack = back,
                     onOpenAccount = openAccount,
                     onOpenStatus = { id -> openStatus(id, null) },
-                    onReply = openReply
+                    onReply = openReply,
+                    filterStore = container.filterStore
                 )
                 is Route.StatusDetail -> StatusDetailScreen(
                     api = detailApi,
@@ -540,5 +604,19 @@ private fun MainScaffold(
                 navigate(destination)
             }
         )
+    }
+}
+
+private suspend fun latestVisibleNotification(
+    api: app.oltnm.data.api.MastodonApi,
+    filterStore: FilterStore
+): Notification? {
+    filterStore.ensureLoaded(api)
+    val filters = filterStore.filters.value
+    val limit = if (filters.isEmpty()) 1 else 20
+    return api.notifications(limit = limit).items.firstOrNull { notification ->
+        notification.status?.let { status ->
+            !FilterMatcher.isHidden(status, filters, context = "notifications")
+        } ?: true
     }
 }

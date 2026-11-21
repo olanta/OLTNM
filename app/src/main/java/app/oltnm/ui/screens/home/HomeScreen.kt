@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.oltnm.R
 import app.oltnm.data.api.MastodonApi
+import app.oltnm.data.filters.FilterStore
 import app.oltnm.data.model.Session
 import app.oltnm.data.model.Status
 import app.oltnm.data.model.TimelineSpec
@@ -165,6 +166,7 @@ fun TimelineScreen(
                     refreshSignal = refreshSignal,
                     cacheStore = container.timelineCacheStore,
                     cacheKey = "${session.key}|${selected.id}|${selected.host.orEmpty()}",
+                    filterStore = container.filterStore,
                     onOpenAccount = onOpenAccount,
                     onOpenStatus = { id -> onOpenStatus(id, remoteHost) },
                     onReply = if (remote) onReplyRemote else onReply
@@ -240,12 +242,13 @@ private fun TimelineView(
     onOpenStatus: (String) -> Unit,
     onReply: (Status) -> Unit,
     cacheStore: TimelineCacheStore? = null,
-    cacheKey: String? = null
+    cacheKey: String? = null,
+    filterStore: FilterStore? = null
 ) {
     val viewModel: TimelineViewModel = viewModel(
         key = "timeline-${spec.id}-${spec.host}-${ownApi.hashCode()}",
         factory = factoryOf {
-            TimelineViewModel(spec, ownApi, remoteApi, cacheStore, cacheKey)
+            TimelineViewModel(spec, ownApi, remoteApi, cacheStore, cacheKey, filterStore)
         }
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -312,7 +315,8 @@ private fun TimelineView(
                         onFavourite = viewModel::toggleFavourite,
                         onReblog = viewModel::toggleReblog,
                         onBookmark = viewModel::toggleBookmark,
-                        interactive = interactive
+                        interactive = interactive,
+                        filterWarning = state.warnings[status.id]
                     )
                 }
                 item {
@@ -335,7 +339,8 @@ fun StatusTimelineScreen(
     onBack: () -> Unit,
     onOpenAccount: (String) -> Unit,
     onOpenStatus: (String) -> Unit,
-    onReply: (Status) -> Unit
+    onReply: (Status) -> Unit,
+    filterStore: FilterStore? = null
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         OltnTopBar(
@@ -356,6 +361,7 @@ fun StatusTimelineScreen(
                 remoteApi = null,
                 interactive = true,
                 refreshSignal = 0,
+                filterStore = filterStore,
                 onOpenAccount = onOpenAccount,
                 onOpenStatus = onOpenStatus,
                 onReply = onReply

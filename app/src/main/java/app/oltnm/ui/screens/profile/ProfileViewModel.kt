@@ -3,6 +3,8 @@ package app.oltnm.ui.screens.profile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.oltnm.data.api.MastodonApi
+import app.oltnm.data.filters.FilterMatcher
+import app.oltnm.data.filters.FilterStore
 import app.oltnm.data.model.Account
 import app.oltnm.data.model.Relationship
 import app.oltnm.data.model.Status
@@ -21,13 +23,16 @@ data class ProfileUiState(
     val refreshing: Boolean = false,
     val loadingMore: Boolean = false,
     val followBusy: Boolean = false,
+    val actionBusy: Boolean = false,
     val nextMaxId: String? = null,
+    val warnings: Map<String, String> = emptyMap(),
     val error: String? = null
 )
 
 class ProfileViewModel(
     private val api: MastodonApi,
-    private val accountId: String
+    private val accountId: String,
+    private val filterStore: FilterStore? = null
 ) : ViewModel() {
     private val _state = MutableStateFlow(ProfileUiState())
     val state: StateFlow<ProfileUiState> = _state.asStateFlow()
@@ -49,16 +54,24 @@ class ProfileViewModel(
             runCatching {
                 val account = api.account(accountId)
                 val page = api.accountStatuses(accountId)
+                filterStore?.ensureLoaded(api)
+                val filtered = FilterMatcher.apply(
+                    items = page.items,
+                    filters = filterStore?.filters?.value.orEmpty(),
+                    context = "account",
+                    nextMaxId = page.nextMaxId
+                )
                 val relationship = runCatching { api.relationship(accountId) }.getOrNull()
-                Triple(account, page, relationship)
+                Triple(account, filtered, relationship)
             }
-                .onSuccess { (account, page, relationship) ->
+                .onSuccess { (account, filtered, relationship) ->
                     _state.update {
                         it.copy(
                             account = account,
                             relationship = relationship,
-                            items = page.items,
-                            nextMaxId = page.nextMaxId,
+                            items = filtered.items,
+                            nextMaxId = filtered.nextMaxId,
+                            warnings = filtered.warnings,
                             loading = false,
                             refreshing = false
                         )
@@ -77,12 +90,22 @@ class ProfileViewModel(
         if (snapshot.loadingMore || snapshot.refreshing || snapshot.nextMaxId == null) return
         viewModelScope.launch {
             _state.update { it.copy(loadingMore = true, error = null) }
-            runCatching { api.accountStatuses(accountId, maxId = snapshot.nextMaxId) }
-                .onSuccess { page ->
+            runCatching {
+                val page = api.accountStatuses(accountId, maxId = snapshot.nextMaxId)
+                filterStore?.ensureLoaded(api)
+                FilterMatcher.apply(
+                    items = page.items,
+                    filters = filterStore?.filters?.value.orEmpty(),
+                    context = "account",
+                    nextMaxId = page.nextMaxId
+                )
+            }
+                .onSuccess { filtered ->
                     _state.update {
                         it.copy(
-                            items = (it.items + page.items).distinctBy(Status::id),
-                            nextMaxId = page.nextMaxId,
+                            items = (it.items + filtered.items).distinctBy(Status::id),
+                            nextMaxId = filtered.nextMaxId,
+                            warnings = it.warnings + filtered.warnings,
                             loadingMore = false
                         )
                     }
@@ -113,6 +136,60 @@ class ProfileViewModel(
                         it.copy(
                             relationship = current,
                             followBusy = false,
+                            error = error.userMessage()
+                        )
+                    }
+                }
+        }
+    }
+
+    fun toggleMute() {
+        val current = _state.value.relationship ?: return
+        if (_state.value.actionBusy) return
+        val next = !current.muting
+        val optimistic = current.copy(muting = next)
+        _state.update { it.copy(relationship = optimistic, actionBusy = true, error = null) }
+        viewModelScope.launch {
+            runCatching {
+                if (next) api.muteAccount(accountId) else api.unmuteAccount(accountId)
+            }
+                .onSuccess { relationship ->
+                    _state.update { it.copy(relationship = relationship, actionBusy = false) }
+                }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            relationship = current,
+                            actionBusy = false,
+                            error = error.userMessage()
+                        )
+                    }
+                }
+        }
+    }
+
+    fun toggleBlock() {
+        val current = _state.value.relationship ?: return
+        if (_state.value.actionBusy) return
+        val next = !current.blocking
+        val optimistic = current.copy(
+            blocking = next,
+            following = if (next) false else current.following,
+            requested = if (next) false else current.requested
+        )
+        _state.update { it.copy(relationship = optimistic, actionBusy = true, error = null) }
+        viewModelScope.launch {
+            runCatching {
+                if (next) api.blockAccount(accountId) else api.unblockAccount(accountId)
+            }
+                .onSuccess { relationship ->
+                    _state.update { it.copy(relationship = relationship, actionBusy = false) }
+                }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            relationship = current,
+                            actionBusy = false,
                             error = error.userMessage()
                         )
                     }

@@ -146,7 +146,9 @@ class ComposeViewModel(
                 _state.update {
                     it.copy(
                         text = target.initialText,
-                        visibility = target.visibility
+                        visibility = target.visibility,
+                        spoiler = target.spoiler,
+                        spoilerEnabled = target.spoilerEnabled
                     )
                 }
             }
@@ -417,10 +419,12 @@ class ComposeViewModel(
         )
 
         viewModelScope.launch {
+            clearDraftForPublish()
             _state.update { it.copy(posting = true, error = null) }
             val resolvedReplyId = if (replyTo?.lookupUrl != null) {
                 val resolved = resolveRemoteReply()
                 if (resolved == null) {
+                    saveDraftAfterFailure(snapshot.text, snapshot)
                     _state.update {
                         it.copy(posting = false, error = ComposeError.Generic)
                     }
@@ -474,6 +478,7 @@ class ComposeViewModel(
             }
 
             if (scheduledAt != null && parts.size > 1) {
+                saveDraftAfterFailure(snapshot.text, snapshot)
                 _state.update {
                     it.copy(posting = false, error = ComposeError.ThreadSchedule)
                 }
@@ -501,6 +506,7 @@ class ComposeViewModel(
                     }
                     .onFailure { error ->
                         OltnLog.w("Scheduled post failed: ${error.javaClass.simpleName}")
+                        saveDraftAfterFailure(snapshot.text, snapshot)
                         _state.update {
                             it.copy(posting = false, error = ComposeError.Generic)
                         }
@@ -542,6 +548,7 @@ class ComposeViewModel(
                 } else {
                     parts.drop(postedCount).joinToString("\n\n")
                 }
+                saveDraftAfterFailure(remaining, snapshot)
                 _state.update {
                     it.copy(posting = false, text = remaining, error = ComposeError.Generic)
                 }
@@ -725,23 +732,46 @@ class ComposeViewModel(
     }
 
     fun consumePosted() {
+        draftJob?.cancel()
         mentionJob?.cancel()
         val current = _state.value
         if (editStatus != null) {
             _state.value = current.copy(posting = false, posted = false, error = null)
             return
         }
+        if (replyTo == null) draftStore.clear()
         _state.value = ComposeUiState(
             text = replyTo?.initialText.orEmpty(),
             visibility = replyTo?.visibility ?: Visibility.Public,
             maxChars = current.maxChars,
             localVisibilitySupported = current.localVisibilitySupported
         )
-        if (replyTo == null) draftStore.clear()
     }
 
     fun clearError() {
         _state.update { it.copy(error = null) }
+    }
+
+    private fun clearDraftForPublish() {
+        if (replyTo != null || editStatus != null) return
+        draftJob?.cancel()
+        draftStore.clear()
+    }
+
+    private fun saveDraftAfterFailure(text: String, snapshot: ComposeUiState) {
+        if (replyTo != null || editStatus != null) return
+        if (text.isBlank() && snapshot.spoiler.isBlank()) {
+            draftStore.clear()
+            return
+        }
+        draftStore.save(
+            ComposeDraftData(
+                text = text,
+                spoiler = snapshot.spoiler,
+                spoilerEnabled = snapshot.spoilerEnabled,
+                visibility = snapshot.visibility.name
+            )
+        )
     }
 
     private fun scheduleDraftSave() {

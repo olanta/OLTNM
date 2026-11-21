@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTextApi::class)
+﻿@file:OptIn(ExperimentalTextApi::class)
 
 package app.oltnm.ui.components
 
@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,12 +72,16 @@ fun StatusCard(
     onBookmark: (Status) -> Unit,
     modifier: Modifier = Modifier,
     onEdit: ((Status) -> Unit)? = null,
-    interactive: Boolean = true
+    interactive: Boolean = true,
+    filterWarning: String? = null
 ) {
     val displayed = status.original
     val semantics = LocalOltnSemantics.current
     var revealed by remember(displayed.id) {
         mutableStateOf(displayed.spoilerText.isBlank())
+    }
+    var filterRevealed by remember(displayed.id, filterWarning) {
+        mutableStateOf(filterWarning == null)
     }
 
     Column(
@@ -154,61 +159,68 @@ fun StatusCard(
 
                 Spacer(Modifier.height(8.dp))
 
-                if (displayed.spoilerText.isNotBlank() && !revealed) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(semantics.replySoft)
-                            .clickable { revealed = true }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.WarningAmber,
-                            contentDescription = null,
-                            tint = semantics.reply,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.content_warning),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = semantics.reply
-                            )
-                            Text(
-                                text = displayed.spoilerText,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Text(
-                            text = stringResource(R.string.tap_to_show),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = semantics.reply
-                        )
-                    }
+                if (filterWarning != null && !filterRevealed) {
+                    FilterWarningRow(
+                        title = filterWarning,
+                        onShow = { filterRevealed = true }
+                    )
                 } else {
-                    if (displayed.spoilerText.isNotBlank()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (displayed.spoilerText.isNotBlank() && !revealed) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(semantics.replySoft)
+                                .clickable { revealed = true }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Icon(
                                 imageVector = Icons.Rounded.WarningAmber,
                                 contentDescription = null,
                                 tint = semantics.reply,
-                                modifier = Modifier.size(15.dp)
+                                modifier = Modifier.size(18.dp)
                             )
-                            Spacer(Modifier.width(6.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.content_warning),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = semantics.reply
+                                )
+                                Text(
+                                    text = displayed.spoilerText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                             Text(
-                                text = displayed.spoilerText,
-                                style = MaterialTheme.typography.bodySmall,
+                                text = stringResource(R.string.tap_to_show),
+                                style = MaterialTheme.typography.labelSmall,
                                 color = semantics.reply
                             )
                         }
-                        Spacer(Modifier.height(6.dp))
-                    }
+                    } else {
+                        if (displayed.spoilerText.isNotBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Rounded.WarningAmber,
+                                    contentDescription = null,
+                                    tint = semantics.reply,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = displayed.spoilerText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = semantics.reply
+                                )
+                            }
+                            Spacer(Modifier.height(6.dp))
+                        }
 
-                    StatusBody(displayed)
+                        StatusBody(displayed)
+                    }
                 }
 
                 StatusActions(
@@ -228,6 +240,35 @@ fun StatusCard(
             thickness = 0.5.dp,
             color = MaterialTheme.colorScheme.outlineVariant
         )
+    }
+}
+
+@Composable
+private fun FilterWarningRow(title: String, onShow: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.WarningAmber,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = stringResource(R.string.filtered_by, title),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        TextButton(onClick = onShow) {
+            Text(stringResource(R.string.show))
+        }
     }
 }
 

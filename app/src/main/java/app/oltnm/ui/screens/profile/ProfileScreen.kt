@@ -16,6 +16,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -26,7 +29,9 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -38,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.oltnm.R
 import app.oltnm.data.api.MastodonApi
+import app.oltnm.data.filters.FilterStore
 import app.oltnm.data.model.Account
 import app.oltnm.data.model.Relationship
 import app.oltnm.data.model.Status
@@ -67,9 +73,13 @@ fun ProfileScreen(
     onBack: () -> Unit,
     onOpenAccount: (String) -> Unit,
     onOpenStatus: (String) -> Unit,
-    onReply: (Status) -> Unit
+    onReply: (Status) -> Unit,
+    filterStore: FilterStore? = null
 ) {
-    val viewModel: ProfileViewModel = viewModel(key = "profile-${api.hashCode()}-$accountId", factory = factoryOf { ProfileViewModel(api, accountId) })
+    val viewModel: ProfileViewModel = viewModel(
+        key = "profile-${api.hashCode()}-$accountId",
+        factory = factoryOf { ProfileViewModel(api, accountId, filterStore) }
+    )
     val state by viewModel.state.collectAsStateWithLifecycle()
     val openUrl = rememberOpenUrl()
     val listState = rememberLazyListState()
@@ -122,9 +132,12 @@ fun ProfileScreen(
                             ProfileHeader(
                                 account = account,
                                 relationship = state.relationship,
-                                showFollow = account.id != currentAccountId,
+                                showActions = account.id != currentAccountId,
                                 followBusy = state.followBusy,
-                                onFollow = viewModel::toggleFollow
+                                actionBusy = state.actionBusy,
+                                onFollow = viewModel::toggleFollow,
+                                onMute = viewModel::toggleMute,
+                                onBlock = viewModel::toggleBlock
                             )
                         }
                     }
@@ -151,7 +164,8 @@ fun ProfileScreen(
                                 onOpenUrl = openUrl,
                                 onFavourite = viewModel::toggleFavourite,
                                 onReblog = viewModel::toggleReblog,
-                                onBookmark = viewModel::toggleBookmark
+                                onBookmark = viewModel::toggleBookmark,
+                                filterWarning = state.warnings[status.id]
                             )
                         }
                     }
@@ -172,10 +186,14 @@ fun ProfileScreen(
 private fun ProfileHeader(
     account: Account,
     relationship: Relationship?,
-    showFollow: Boolean,
+    showActions: Boolean,
     followBusy: Boolean,
-    onFollow: () -> Unit
+    actionBusy: Boolean,
+    onFollow: () -> Unit,
+    onMute: () -> Unit,
+    onBlock: () -> Unit
 ) {
+    var menuOpen by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
@@ -222,9 +240,53 @@ private fun ProfileHeader(
                     )
                 }
             }
+            if (showActions && relationship != null) {
+                Box {
+                    IconButton(
+                        onClick = { menuOpen = true },
+                        enabled = !actionBusy
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.MoreVert,
+                            contentDescription = stringResource(R.string.moderation_title)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(
+                                        if (relationship.muting) R.string.unmute else R.string.mute
+                                    )
+                                )
+                            },
+                            onClick = {
+                                menuOpen = false
+                                onMute()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(
+                                        if (relationship.blocking) R.string.unblock else R.string.block
+                                    )
+                                )
+                            },
+                            onClick = {
+                                menuOpen = false
+                                onBlock()
+                            }
+                        )
+                    }
+                }
+            }
         }
 
-        if (showFollow && relationship != null) {
+        if (showActions && relationship != null && !relationship.blocking) {
             ProfileFollowRow(
                 relationship = relationship,
                 followBusy = followBusy,

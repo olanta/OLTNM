@@ -88,6 +88,7 @@ fun SearchScreen(
     instanceHost: String,
     onOpenAccount: (String) -> Unit,
     onOpenStatus: (String) -> Unit,
+    onOpenTag: (String) -> Unit,
     onReply: (Status) -> Unit
 ) {
     val context = LocalContext.current
@@ -196,7 +197,7 @@ fun SearchScreen(
                         } else {
                             LazyColumn(modifier = Modifier.fillMaxSize()) {
                                 items(results.hashtags, key = { it.name }) { tag ->
-                                    HashtagRow(tag = tag, onOpenUrl = openUrl)
+                                    HashtagRow(tag = tag, onOpen = { onOpenTag(tag.name) })
                                 }
                             }
                         }
@@ -706,12 +707,12 @@ private fun AccountRow(account: Account, onOpenAccount: (String) -> Unit) {
 }
 
 @Composable
-private fun HashtagRow(tag: Tag, onOpenUrl: (String) -> Unit) {
+private fun HashtagRow(tag: Tag, onOpen: () -> Unit) {
     val tagColor = LocalOltnSemantics.current.tag
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onOpenUrl(tag.url) }
+            .clickable(onClick = onOpen)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

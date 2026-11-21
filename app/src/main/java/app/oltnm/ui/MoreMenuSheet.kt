@@ -9,15 +9,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AlternateEmail
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.BookmarkBorder
+import androidx.compose.material.icons.rounded.Campaign
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.FormatListBulleted
 import androidx.compose.material.icons.rounded.Newspaper
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Tag
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,6 +63,7 @@ fun MoreMenuSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 24.dp)
         ) {
@@ -115,6 +122,26 @@ fun MoreMenuSheet(
                 icon = Icons.Rounded.FormatListBulleted,
                 label = stringResource(R.string.lists),
                 onClick = { onNavigate(Route.Lists) }
+            )
+            MenuRow(
+                icon = Icons.Rounded.Tag,
+                label = stringResource(R.string.followed_tags),
+                onClick = { onNavigate(Route.FollowedTags) }
+            )
+            MenuRow(
+                icon = Icons.Rounded.FilterAlt,
+                label = stringResource(R.string.filters_title),
+                onClick = { onNavigate(Route.Filters) }
+            )
+            MenuRow(
+                icon = Icons.Rounded.Campaign,
+                label = stringResource(R.string.announcements),
+                onClick = { onNavigate(Route.Announcements) }
+            )
+            MenuRow(
+                icon = Icons.Rounded.Block,
+                label = stringResource(R.string.moderation_title),
+                onClick = { onNavigate(Route.Moderation) }
             )
             MenuRow(
                 icon = Icons.Rounded.TrendingUp,

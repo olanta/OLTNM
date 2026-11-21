@@ -135,7 +135,53 @@ data class Mention(
 @Serializable
 data class Tag(
     val name: String = "",
-    val url: String = ""
+    val url: String = "",
+    val following: Boolean = false
+)
+
+@Serializable
+data class Announcement(
+    val id: String = "",
+    val content: String = "",
+    @SerialName("starts_at") val startsAt: String? = null,
+    @SerialName("ends_at") val endsAt: String? = null,
+    @SerialName("all_day") val allDay: Boolean = false,
+    @SerialName("published_at") val publishedAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    val read: Boolean = false,
+    val emojis: List<Emoji> = emptyList()
+)
+
+@Serializable
+data class MastodonFilter(
+    val id: String = "",
+    val title: String = "",
+    val context: List<String> = emptyList(),
+    @SerialName("expires_at") val expiresAt: String? = null,
+    @SerialName("filter_action") val filterAction: String = "warn",
+    val keywords: List<FilterKeyword> = emptyList()
+)
+
+@Serializable
+data class FilterKeyword(
+    val id: String = "",
+    val keyword: String = "",
+    @SerialName("whole_word") val wholeWord: Boolean = true
+)
+
+@Serializable
+data class FilterRequest(
+    val title: String,
+    val context: List<String>,
+    @SerialName("filter_action") val filterAction: String,
+    @SerialName("expires_in") val expiresIn: Long? = null,
+    @SerialName("keywords_attributes") val keywords: List<FilterKeywordRequest>
+)
+
+@Serializable
+data class FilterKeywordRequest(
+    val keyword: String,
+    @SerialName("whole_word") val wholeWord: Boolean = true
 )
 
 @Serializable

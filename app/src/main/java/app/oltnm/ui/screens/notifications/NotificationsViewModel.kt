@@ -3,6 +3,8 @@ package app.oltnm.ui.screens.notifications
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.oltnm.data.api.MastodonApi
+import app.oltnm.data.filters.FilterMatcher
+import app.oltnm.data.filters.FilterStore
 import app.oltnm.data.model.Notification
 import app.oltnm.util.userMessage
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +22,10 @@ data class NotificationsUiState(
     val error: String? = null
 )
 
-class NotificationsViewModel(private val api: MastodonApi) : ViewModel() {
+class NotificationsViewModel(
+    private val api: MastodonApi,
+    private val filterStore: FilterStore? = null
+) : ViewModel() {
     private val _state = MutableStateFlow(NotificationsUiState())
     val state: StateFlow<NotificationsUiState> = _state.asStateFlow()
 
@@ -38,11 +43,14 @@ class NotificationsViewModel(private val api: MastodonApi) : ViewModel() {
                     error = null
                 )
             }
-            runCatching { api.notifications() }
+            runCatching {
+                filterStore?.ensureLoaded(api)
+                api.notifications()
+            }
                 .onSuccess { page ->
                     _state.update {
                         it.copy(
-                            items = page.items,
+                            items = page.items.filterNot(::isHidden),
                             nextMaxId = page.nextMaxId,
                             loading = false,
                             refreshing = false
@@ -62,11 +70,15 @@ class NotificationsViewModel(private val api: MastodonApi) : ViewModel() {
         if (snapshot.loadingMore || snapshot.refreshing || snapshot.nextMaxId == null) return
         viewModelScope.launch {
             _state.update { it.copy(loadingMore = true, error = null) }
-            runCatching { api.notifications(maxId = snapshot.nextMaxId) }
+            runCatching {
+                filterStore?.ensureLoaded(api)
+                api.notifications(maxId = snapshot.nextMaxId)
+            }
                 .onSuccess { page ->
                     _state.update {
                         it.copy(
-                            items = (it.items + page.items).distinctBy(Notification::id),
+                            items = (it.items + page.items.filterNot(::isHidden))
+                                .distinctBy(Notification::id),
                             nextMaxId = page.nextMaxId,
                             loadingMore = false
                         )
@@ -80,5 +92,14 @@ class NotificationsViewModel(private val api: MastodonApi) : ViewModel() {
 
     fun clearError() {
         _state.update { it.copy(error = null) }
+    }
+
+    private fun isHidden(notification: Notification): Boolean {
+        val status = notification.status ?: return false
+        return FilterMatcher.isHidden(
+            status = status,
+            filters = filterStore?.filters?.value.orEmpty(),
+            context = "notifications"
+        )
     }
 }
