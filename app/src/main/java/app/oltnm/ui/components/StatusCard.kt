@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.FormatQuote
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.WarningAmber
@@ -72,6 +73,7 @@ fun StatusCard(
     onBookmark: (Status) -> Unit,
     modifier: Modifier = Modifier,
     onEdit: ((Status) -> Unit)? = null,
+    onQuote: ((Status) -> Unit)? = null,
     interactive: Boolean = true,
     filterWarning: String? = null
 ) {
@@ -221,6 +223,14 @@ fun StatusCard(
 
                         StatusBody(displayed)
                     }
+
+                    displayed.quotedStatus?.let { quoted ->
+                        QuotedStatusPreview(
+                            status = quoted,
+                            onOpenStatus = onOpenStatus,
+                            onOpenAccount = onOpenAccount
+                        )
+                    }
                 }
 
                 StatusActions(
@@ -231,6 +241,7 @@ fun StatusCard(
                     onReblog = { onReblog(status) },
                     onBookmark = { onBookmark(status) },
                     onEdit = onEdit?.let { callback -> { callback(displayed) } },
+                    onQuote = onQuote?.let { callback -> { callback(displayed) } },
                     interactive = interactive
                 )
             }
@@ -240,6 +251,74 @@ fun StatusCard(
             thickness = 0.5.dp,
             color = MaterialTheme.colorScheme.outlineVariant
         )
+    }
+}
+
+@Composable
+private fun QuotedStatusPreview(
+    status: Status,
+    onOpenStatus: (Status) -> Unit,
+    onOpenAccount: (String) -> Unit
+) {
+    val original = status.original
+    val content = HtmlText.plain(
+        original.content,
+        original.emojis.filter { it.url.isNotBlank() }.map { it.shortcode }.toSet()
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable { onOpenStatus(original) }
+            .padding(10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Avatar(
+                url = original.account.avatar,
+                size = 24.dp,
+                modifier = Modifier.clickable { onOpenAccount(original.account.id) }
+            )
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                val name = rememberEmojiText(original.account.nameOrHandle, original.account.emojis)
+                Text(
+                    text = name.text,
+                    inlineContent = name.inlineContent,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "@${original.account.acct}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = RelativeTime.format(
+                    iso = original.createdAt,
+                    nowLabel = stringResource(R.string.time_now)
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (content.isNotBlank()) {
+            val quoteText = rememberEmojiText(content, original.emojis)
+            Text(
+                text = quoteText.text,
+                inlineContent = quoteText.inlineContent,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
     }
 }
 
@@ -356,6 +435,7 @@ private fun StatusActions(
     onReblog: () -> Unit,
     onBookmark: () -> Unit,
     onEdit: (() -> Unit)?,
+    onQuote: (() -> Unit)?,
     interactive: Boolean
 ) {
     val semantics = LocalOltnSemantics.current
@@ -373,6 +453,16 @@ private fun StatusActions(
                 contentDescription = stringResource(R.string.action_reply),
                 onClick = onReply
             )
+            if (onQuote != null) {
+                StatusAction(
+                    icon = Icons.Rounded.FormatQuote,
+                    count = 0,
+                    tint = MaterialTheme.colorScheme.primary,
+                    active = false,
+                    contentDescription = stringResource(R.string.action_quote),
+                    onClick = onQuote
+                )
+            }
             StatusAction(
                 icon = Icons.Rounded.Repeat,
                 count = status.reblogsCount,

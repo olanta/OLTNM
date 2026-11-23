@@ -74,6 +74,7 @@ fun ProfileScreen(
     onOpenAccount: (String) -> Unit,
     onOpenStatus: (String) -> Unit,
     onReply: (Status) -> Unit,
+    onQuote: (Status) -> Unit,
     filterStore: FilterStore? = null
 ) {
     val viewModel: ProfileViewModel = viewModel(
@@ -161,6 +162,7 @@ fun ProfileScreen(
                                 onOpenAccount = onOpenAccount,
                                 onOpenStatus = { onOpenStatus(it.original.id) },
                                 onReply = onReply,
+                                onQuote = onQuote,
                                 onOpenUrl = openUrl,
                                 onFavourite = viewModel::toggleFavourite,
                                 onReblog = viewModel::toggleReblog,

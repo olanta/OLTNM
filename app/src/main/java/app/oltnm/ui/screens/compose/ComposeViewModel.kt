@@ -65,6 +65,7 @@ data class ComposeUiState(
     val spoiler: String = "",
     val sensitive: Boolean = false,
     val quotePolicy: QuotePolicy = QuotePolicy.Public,
+    val quotedStatus: Status? = null,
     val posting: Boolean = false,
     val posted: Boolean = false,
     val scheduled: Boolean = false,
@@ -90,7 +91,8 @@ class ComposeViewModel(
     private val translateApi: TranslateApi,
     private val draftStore: DraftStore,
     private val replyTo: ReplyTarget? = null,
-    private val editStatus: Status? = null
+    private val editStatus: Status? = null,
+    private val quoteStatus: Status? = null
 ) : ViewModel() {
     private val _state = MutableStateFlow(ComposeUiState())
     val state: StateFlow<ComposeUiState> = _state.asStateFlow()
@@ -128,6 +130,9 @@ class ComposeViewModel(
                         }
                     )
                 }
+            }
+            quoteStatus != null -> {
+                _state.update { it.copy(quotedStatus = quoteStatus.original) }
             }
             target == null -> {
                 draftStore.load()?.let { draft ->
@@ -245,6 +250,10 @@ class ComposeViewModel(
         _state.update { it.copy(quotePolicy = value) }
     }
 
+    fun removeQuote() {
+        _state.update { it.copy(quotedStatus = null) }
+    }
+
     fun togglePoll() {
         val snapshot = _state.value
         if (snapshot.uploading) return
@@ -350,7 +359,10 @@ class ComposeViewModel(
         }
 
         when {
-            snapshot.text.isBlank() && snapshot.media.isEmpty() && poll == null -> {
+            snapshot.text.isBlank() &&
+                snapshot.media.isEmpty() &&
+                poll == null &&
+                snapshot.quotedStatus == null -> {
                 _state.update { it.copy(error = ComposeError.Empty) }
                 return
             }
@@ -371,6 +383,7 @@ class ComposeViewModel(
         } else {
             snapshot.quotePolicy.apiValue
         }
+        val quotedStatusId = snapshot.quotedStatus?.original?.id
 
         val editing = editStatus
         if (editing != null) {
@@ -495,6 +508,7 @@ class ComposeViewModel(
                     mediaIds = mediaIds,
                     poll = poll,
                     scheduledAt = scheduledAt,
+                    quotedStatusId = quotedStatusId,
                     quoteApprovalPolicy = quotePolicy
                 )
                 runCatching { api.scheduleStatus(request) }
@@ -530,6 +544,7 @@ class ComposeViewModel(
                     sensitive = index == 0 && snapshot.sensitive,
                     mediaIds = if (index == 0) mediaIds else emptyList(),
                     poll = if (index == 0) poll else null,
+                    quotedStatusId = if (index == 0) quotedStatusId else null,
                     quoteApprovalPolicy = if (index == 0) quotePolicy else null
                 )
                 val outcome = runCatching { api.postStatus(request) }

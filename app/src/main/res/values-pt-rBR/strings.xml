@@ -359,6 +359,7 @@
     <string name="filters_context_notifications">Notificações</string>
     <string name="filters_context_thread">Conversas</string>
     <string name="filters_context_account">Perfis</string>
+    <string name="action_quote">Citar</string>
     <string name="filtered_by">Filtrado por: %1$s</string>
     <string name="show">Mostrar</string>
 </resources>

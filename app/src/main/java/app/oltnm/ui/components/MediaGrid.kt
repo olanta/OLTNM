@@ -1,4 +1,4 @@
-package app.oltnm.ui.components
+﻿package app.oltnm.ui.components
 
 import android.net.Uri
 import android.widget.MediaController
@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -54,7 +56,7 @@ fun MediaGrid(
     if (media.isEmpty()) return
     val mediaBg = LocalOltnSemantics.current.mediaBg
     val shown = media.take(4)
-    var viewer by remember { mutableStateOf<MediaAttachment?>(null) }
+    var viewerIndex by remember { mutableStateOf<Int?>(null) }
 
     Column(
         modifier = modifier.padding(top = 10.dp),
@@ -66,7 +68,7 @@ fun MediaGrid(
                 modifier = Modifier.fillMaxWidth().aspectRatio(4f / 3f),
                 mediaBg = mediaBg,
                 single = true,
-                onClick = { viewer = shown.first() }
+                onClick = { viewerIndex = 0 }
             )
         } else {
             shown.chunked(2).forEach { row ->
@@ -79,7 +81,7 @@ fun MediaGrid(
                             attachment = attachment,
                             modifier = Modifier.weight(1f).aspectRatio(1.3f),
                             mediaBg = mediaBg,
-                            onClick = { viewer = attachment }
+                            onClick = { viewerIndex = media.indexOf(attachment) }
                         )
                     }
                     if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -95,10 +97,11 @@ fun MediaGrid(
         }
     }
 
-    viewer?.let { attachment ->
+    viewerIndex?.let { index ->
         MediaViewerDialog(
-            attachment = attachment,
-            onDismiss = { viewer = null }
+            media = media,
+            initialIndex = index,
+            onDismiss = { viewerIndex = null }
         )
     }
 }
@@ -143,9 +146,14 @@ private fun MediaThumb(
 
 @Composable
 private fun MediaViewerDialog(
-    attachment: MediaAttachment,
+    media: List<MediaAttachment>,
+    initialIndex: Int,
     onDismiss: () -> Unit
 ) {
+    val pagerState = rememberPagerState(
+        initialPage = initialIndex.coerceIn(0, media.lastIndex),
+        pageCount = { media.size }
+    )
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -155,55 +163,23 @@ private fun MediaViewerDialog(
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
-            if (attachment.type == "image") {
-                AsyncImage(
-                    model = attachment.bestUrl,
-                    contentDescription = attachment.description,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                AndroidView(
-                    factory = { context ->
-                        VideoView(context).apply {
-                            val controller = MediaController(context)
-                            controller.setAnchorView(this)
-                            setMediaController(controller)
-                            setVideoURI(Uri.parse(attachment.bestUrl))
-                            setOnPreparedListener { player ->
-                                player.isLooping = attachment.type == "gifv"
-                                start()
-                            }
-                        }
-                    },
-                    onRelease = { it.stopPlayback() },
-                    modifier = Modifier.fillMaxSize()
-                )
-                if (attachment.type == "audio") {
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.AudioFile,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.size(64.dp)
-                        )
-                        Text(
-                            text = attachment.description
-                                .orEmpty()
-                                .ifBlank { stringResource(R.string.media_audio) },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(top = 12.dp)
-                        )
-                    }
-                }
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                MediaViewerPage(attachment = media[page])
             }
+
+            Text(
+                text = "${pagerState.currentPage + 1} / ${media.size}",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+                    .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            )
 
             IconButton(
                 onClick = onDismiss,
@@ -217,6 +193,78 @@ private fun MediaViewerDialog(
                     contentDescription = stringResource(R.string.dismiss),
                     tint = Color.White
                 )
+            }
+
+            val description = media[pagerState.currentPage].description
+            if (!description.isNullOrBlank()) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    maxLines = 4,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(24.dp)
+                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+                        .padding(12.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MediaViewerPage(attachment: MediaAttachment) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (attachment.type == "image") {
+            AsyncImage(
+                model = attachment.bestUrl,
+                contentDescription = attachment.description,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            AndroidView(
+                factory = { context ->
+                    VideoView(context).apply {
+                        val controller = MediaController(context)
+                        controller.setAnchorView(this)
+                        setMediaController(controller)
+                        setVideoURI(Uri.parse(attachment.bestUrl))
+                        setOnPreparedListener { player ->
+                            player.isLooping = attachment.type == "gifv"
+                            start()
+                        }
+                    }
+                },
+                onRelease = { it.stopPlayback() },
+                modifier = Modifier.fillMaxSize()
+            )
+            if (attachment.type == "audio") {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.AudioFile,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Text(
+                        text = attachment.description
+                            .orEmpty()
+                            .ifBlank { stringResource(R.string.media_audio) },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                }
             }
         }
     }

@@ -29,6 +29,20 @@ class StatusRequestTest {
     }
 
     @Test
+    fun serializesQuotedStatusAndPolicy() {
+        val json = JsonConfig.encodeStatusRequest(
+            StatusRequest(
+                status = "Hello",
+                quotedStatusId = "99",
+                quoteApprovalPolicy = "public"
+            )
+        )
+
+        assertTrue(json.contains("\"quoted_status_id\":\"99\""))
+        assertTrue(json.contains("\"quote_approval_policy\":\"public\""))
+    }
+
+    @Test
     fun alwaysSerializesEditableFields() {
         val json = JsonConfig.encodeStatusRequest(StatusRequest(status = "Hello"))
 

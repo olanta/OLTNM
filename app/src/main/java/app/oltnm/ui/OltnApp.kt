@@ -103,6 +103,7 @@ sealed interface Route {
     data class StatusTimeline(val spec: TimelineSpec, val title: String) : Route
     data class StatusDetail(val statusId: String, val host: String? = null) : Route
     data class ComposeReply(val target: ReplyTarget) : Route
+    data class ComposeQuote(val status: Status) : Route
     data class EditStatus(val status: Status) : Route
 }
 
@@ -263,6 +264,9 @@ private fun MainScaffold(
     val openStatus: (String, String?) -> Unit = { statusId, host ->
         stack.add(Route.StatusDetail(statusId, host))
     }
+    val openQuote: (Status) -> Unit = { status ->
+        stack.add(Route.ComposeQuote(status))
+    }
     val openReply: (Status) -> Unit = { status ->
         stack.add(Route.ComposeReply(ReplyTarget.from(status, session.accountId)))
     }
@@ -408,6 +412,7 @@ private fun MainScaffold(
                     onOpenStatus = openStatus,
                     onReply = openReply,
                     onReplyRemote = openRemoteReply,
+                    onQuote = openQuote,
                     onManageTimelines = { navigate(Route.ManageTimelines) }
                 )
                 Route.Search -> SearchScreen(
@@ -416,6 +421,7 @@ private fun MainScaffold(
                     instanceHost = session.host,
                     onOpenAccount = openAccount,
                     onOpenStatus = { id -> openStatus(id, null) },
+                    onQuote = openQuote,
                     onOpenTag = { name ->
                         navigate(
                             Route.StatusTimeline(
@@ -545,6 +551,7 @@ private fun MainScaffold(
                     onOpenAccount = openAccount,
                     onOpenStatus = { id -> openStatus(id, null) },
                     onReply = openReply,
+                    onQuote = openQuote,
                     filterStore = container.filterStore
                 )
                 is Route.StatusTimeline -> StatusTimelineScreen(
@@ -555,6 +562,7 @@ private fun MainScaffold(
                     onOpenAccount = openAccount,
                     onOpenStatus = { id -> openStatus(id, null) },
                     onReply = openReply,
+                    onQuote = openQuote,
                     filterStore = container.filterStore
                 )
                 is Route.StatusDetail -> StatusDetailScreen(
@@ -566,6 +574,7 @@ private fun MainScaffold(
                     onOpenAccount = openAccount,
                     onOpenStatus = { id -> openStatus(id, current.host) },
                     onReply = openReply,
+                    onQuote = openQuote,
                     onEdit = { status -> navigate(Route.EditStatus(status)) }
                 )
                 is Route.ComposeReply -> ComposeScreen(
@@ -575,6 +584,16 @@ private fun MainScaffold(
                     draftStore = container.draftStore,
                     preferences = container.preferences,
                     replyTo = current.target,
+                    onBack = back,
+                    onPosted = back
+                )
+                is Route.ComposeQuote -> ComposeScreen(
+                    api = api,
+                    giphyApi = container.giphyApi,
+                    translateApi = container.translateApi,
+                    draftStore = container.draftStore,
+                    preferences = container.preferences,
+                    quoteStatus = current.status,
                     onBack = back,
                     onPosted = back
                 )

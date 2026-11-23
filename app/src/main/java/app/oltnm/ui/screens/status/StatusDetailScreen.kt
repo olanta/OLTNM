@@ -65,6 +65,7 @@ fun StatusDetailScreen(
     onOpenAccount: (String) -> Unit,
     onOpenStatus: (String) -> Unit,
     onReply: (Status) -> Unit,
+    onQuote: (Status) -> Unit,
     onEdit: (Status) -> Unit
 ) {
     val viewModel: StatusDetailViewModel = viewModel(
@@ -226,6 +227,7 @@ fun StatusDetailScreen(
                                         onOpenAccount = accountCallback,
                                         onOpenStatus = {},
                                         onReply = onReply,
+                                        onQuote = onQuote,
                                         onOpenUrl = openUrl,
                                         onFavourite = viewModel::toggleFavourite,
                                         onReblog = viewModel::toggleReblog,
@@ -248,6 +250,7 @@ fun StatusDetailScreen(
                                         onOpenAccount = accountCallback,
                                         onOpenStatus = { onOpenStatus(it.original.id) },
                                         onReply = onReply,
+                                        onQuote = onQuote,
                                         onOpenUrl = openUrl,
                                         onFavourite = viewModel::toggleFavourite,
                                         onReblog = viewModel::toggleReblog,
@@ -281,6 +284,7 @@ fun StatusDetailScreen(
                                             onOpenAccount = accountCallback,
                                             onOpenStatus = { onOpenStatus(it.original.id) },
                                             onReply = onReply,
+                                            onQuote = onQuote,
                                             onOpenUrl = openUrl,
                                             onFavourite = viewModel::toggleFavourite,
                                             onReblog = viewModel::toggleReblog,

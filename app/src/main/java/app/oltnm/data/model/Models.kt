@@ -2,10 +2,17 @@
 
 package app.oltnm.data.model
 
+import app.oltnm.data.api.JsonConfig
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class Emoji(
@@ -109,13 +116,41 @@ data class Status(
     val uri: String? = null,
     @SerialName("in_reply_to_id") val inReplyToId: String? = null,
     val poll: Poll? = null,
-    val reblog: Status? = null
+    val reblog: Status? = null,
+    @SerialName("quote_id") val quoteId: String? = null,
+    @SerialName("quote") val quote: JsonElement? = null
 ) {
     val original: Status
         get() = reblog ?: this
 
+    val quotedStatus: Status?
+        get() = quoteCache.value
+
     val displayUrl: String?
         get() = url ?: uri
+
+    @Transient
+    private val quoteCache: Lazy<Status?> = lazy {
+        val element = quote ?: return@lazy null
+        runCatching {
+            val obj = element.jsonObject
+            if (obj["quoted_status"] != null) {
+                val state = obj["state"]?.jsonPrimitive?.contentOrNull
+                if (state != null && state != "accepted") {
+                    null
+                } else {
+                    JsonConfig.json.decodeFromJsonElement(
+                        Status.serializer(),
+                        obj.getValue("quoted_status")
+                    )
+                }
+            } else if (obj["account"] != null) {
+                JsonConfig.json.decodeFromJsonElement(Status.serializer(), element)
+            } else {
+                null
+            }
+        }.getOrNull()
+    }
 }
 
 @Serializable

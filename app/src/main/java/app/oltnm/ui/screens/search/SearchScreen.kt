@@ -89,7 +89,8 @@ fun SearchScreen(
     onOpenAccount: (String) -> Unit,
     onOpenStatus: (String) -> Unit,
     onOpenTag: (String) -> Unit,
-    onReply: (Status) -> Unit
+    onReply: (Status) -> Unit,
+    onQuote: (Status) -> Unit
 ) {
     val context = LocalContext.current
     val seedGroups = remember(context) { DiscoverSeedData.load(context) }
@@ -211,6 +212,7 @@ fun SearchScreen(
                                         onOpenAccount = onOpenAccount,
                                         onOpenStatus = { onOpenStatus(it.original.id) },
                                         onReply = onReply,
+                                        onQuote = onQuote,
                                         onOpenUrl = openUrl,
                                         onFavourite = viewModel::toggleFavourite,
                                         onReblog = viewModel::toggleReblog,

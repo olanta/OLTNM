@@ -66,8 +66,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -81,6 +83,7 @@ import app.oltnm.data.model.Status
 import app.oltnm.data.model.Visibility
 import app.oltnm.data.store.DraftStore
 import app.oltnm.data.store.PreferencesStore
+import app.oltnm.ui.components.Avatar
 import app.oltnm.ui.components.EmojiPickerSheet
 import app.oltnm.ui.components.GifPickerSheet
 import app.oltnm.ui.components.MentionSuggestions
@@ -92,8 +95,10 @@ import app.oltnm.ui.components.OltnTextField
 import app.oltnm.ui.components.OltnTextFieldValue
 import app.oltnm.ui.components.OltnTopBar
 import app.oltnm.ui.components.TranslateTargetSheet
+import app.oltnm.ui.components.rememberEmojiText
 import app.oltnm.ui.factoryOf
 import app.oltnm.util.CodeImage
+import app.oltnm.util.HtmlText
 import app.oltnm.util.Mentions
 import app.oltnm.util.TextImage
 import app.oltnm.util.TextImageStyle
@@ -117,16 +122,26 @@ fun ComposeScreen(
     sessionKey: Int = 0,
     replyTo: ReplyTarget? = null,
     editStatus: Status? = null,
+    quoteStatus: Status? = null,
     onBack: (() -> Unit)? = null
 ) {
     val viewModel: ComposeViewModel = viewModel(
         key = when {
             editStatus != null -> "compose-edit-${editStatus.id}"
             replyTo != null -> "compose-reply-${replyTo.statusId}"
+            quoteStatus != null -> "compose-quote-${quoteStatus.id}"
             else -> "compose-${api.hashCode()}-$sessionKey"
         },
         factory = factoryOf {
-            ComposeViewModel(api, giphyApi, translateApi, draftStore, replyTo, editStatus)
+            ComposeViewModel(
+                api,
+                giphyApi,
+                translateApi,
+                draftStore,
+                replyTo,
+                editStatus,
+                quoteStatus
+            )
         }
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -279,7 +294,12 @@ fun ComposeScreen(
     val codeBlocks = remember(state.text, state.poll) {
         if (state.poll == null) CodeImage.extractCodeBlocks(state.text) else emptyList()
     }
-    val canPost = (state.text.isNotBlank() || state.media.isNotEmpty() || state.poll != null) &&
+    val canPost = (
+        state.text.isNotBlank() ||
+            state.media.isNotEmpty() ||
+            state.poll != null ||
+            state.quotedStatus != null
+        ) &&
         !state.posting &&
         !state.uploading &&
         (state.scheduledAtMillis == null || threadParts == 1) &&
@@ -377,6 +397,13 @@ fun ComposeScreen(
                     placeholder = stringResource(R.string.compose_hint),
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
                 )
+
+                state.quotedStatus?.let { quoted ->
+                    ComposeQuotePreview(
+                        status = quoted,
+                        onRemove = viewModel::removeQuote
+                    )
+                }
 
                 MentionSuggestions(
                     accounts = state.mentionSuggestions,
@@ -839,6 +866,62 @@ private fun ComposeToolButton(
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
                 modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ComposeQuotePreview(
+    status: Status,
+    onRemove: () -> Unit
+) {
+    val original = status.original
+    val content = HtmlText.plain(
+        original.content,
+        original.emojis.filter { it.url.isNotBlank() }.map { it.shortcode }.toSet()
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(10.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Avatar(url = original.account.avatar, size = 28.dp)
+        Spacer(Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            val name = rememberEmojiText(original.account.nameOrHandle, original.account.emojis)
+            Text(
+                text = name.text,
+                inlineContent = name.inlineContent,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+            Text(
+                text = "@${original.account.acct}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+            if (content.isNotBlank()) {
+                Text(
+                    text = content,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+        IconButton(onClick = onRemove) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = stringResource(R.string.remove),
+                modifier = Modifier.size(18.dp)
             )
         }
     }

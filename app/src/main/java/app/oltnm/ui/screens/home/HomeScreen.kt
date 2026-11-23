@@ -78,6 +78,7 @@ fun TimelineScreen(
     onOpenStatus: (String, String?) -> Unit,
     onReply: (Status) -> Unit,
     onReplyRemote: (Status) -> Unit,
+    onQuote: (Status) -> Unit,
     onManageTimelines: () -> Unit
 ) {
     val timelines by container.timelineStore.timelines.collectAsStateWithLifecycle()
@@ -169,7 +170,8 @@ fun TimelineScreen(
                     filterStore = container.filterStore,
                     onOpenAccount = onOpenAccount,
                     onOpenStatus = { id -> onOpenStatus(id, remoteHost) },
-                    onReply = if (remote) onReplyRemote else onReply
+                    onReply = if (remote) onReplyRemote else onReply,
+                    onQuote = onQuote
                 )
             }
         }
@@ -241,6 +243,7 @@ private fun TimelineView(
     onOpenAccount: (String) -> Unit,
     onOpenStatus: (String) -> Unit,
     onReply: (Status) -> Unit,
+    onQuote: (Status) -> Unit,
     cacheStore: TimelineCacheStore? = null,
     cacheKey: String? = null,
     filterStore: FilterStore? = null
@@ -311,6 +314,7 @@ private fun TimelineView(
                         onOpenAccount = accountCallback,
                         onOpenStatus = { onOpenStatus(it.original.id) },
                         onReply = onReply,
+                        onQuote = onQuote,
                         onOpenUrl = openUrl,
                         onFavourite = viewModel::toggleFavourite,
                         onReblog = viewModel::toggleReblog,
@@ -340,6 +344,7 @@ fun StatusTimelineScreen(
     onOpenAccount: (String) -> Unit,
     onOpenStatus: (String) -> Unit,
     onReply: (Status) -> Unit,
+    onQuote: (Status) -> Unit,
     filterStore: FilterStore? = null
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -364,7 +369,8 @@ fun StatusTimelineScreen(
                 filterStore = filterStore,
                 onOpenAccount = onOpenAccount,
                 onOpenStatus = onOpenStatus,
-                onReply = onReply
+                onReply = onReply,
+                onQuote = onQuote
             )
         }
     }
